@@ -71,8 +71,10 @@ export class AppComponent implements AfterContentChecked {
         this.translateService.use("zh")
       } else if (lang === "ko") {
         this.translateService.use("ko")
-      } else {
+      } else if (lang === "en") {
         this.translateService.use("en")
+      } else {
+        this.translateService.use("ru")
       }
       this.translateService.setDefaultLang('en');
     }
