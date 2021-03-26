@@ -20,7 +20,7 @@
     <!-- title -->
     <div class="ddp-ui-title" >
       <div class="ddp-ui-title-in" style="padding-right: 100px;">
-        <span class="ddp-data-title">{{workspaceName}} </span>
+        <span class="ddp-data-title">{{'msg.comm.menu.admin.workspace.shared' | translate}} {{workspaceName}} </span>
         <span *ngIf="''!== workspaceDescription" class="ddp-data-detail">{{workspaceDescription}}</span>
         <!-- button -->
         <div class="ddp-btn-control">
@@ -141,7 +141,7 @@
     <div class="ddp-ui-space-nav">
       <div (click)="topFolder()" class="ddp-data-nav">
           <em class="ddp-icon-space" ></em>
-          <span>{{workspaceName}}</span>
+          <span>{{'msg.comm.menu.admin.workspace.shared' | translate}} {{workspaceName}}</span>
         <!-- 폴더 생성 -->
         <a *ngIf="!folder.hierarchies && permissionChecker && permissionChecker.isManageWsFolder()" (click)="createFolder()"
            draggable="false" href="javascript:" class="ddp-btn-folderplus" ></a>
@@ -307,7 +307,7 @@
             <i class="ddp-icon-checkbox"></i>
           </div>
           <div class="ddp-box-tag ddp-{{book.type}}">
-            {{book.type}}
+            {{book.type | translate}}
           </div>
           <em class="ddp-icon-new" *ngIf="book.createdTime | moment: 'isNew'">{{'msg.common.ui.new' | translate}}</em>
         </div>

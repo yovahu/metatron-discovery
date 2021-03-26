@@ -57,7 +57,7 @@ table.ddp-table-form tbody tr td .ddp-txt-long.ddp-global.ddp-new {padding-right
 table.ddp-table-form tbody tr td .ddp-txt-long.ddp-global.ddp-new em.ddp-tag-global {right:40px;}
 table.ddp-table-form tbody tr td .ddp-txt-long.ddp-global.ddp-en-connection {padding-right:100px;}
 table.ddp-table-form tbody tr td .ddp-txt-long.ddp-global.ddp-en-connection .ddp-tag-global {width:auto;}
-table.ddp-table-form tbody tr td .ddp-txt-long em.ddp-tag-global {position:absolute; top:0; right:0; height:20px; width:60px; padding:2px 2px 3px 2px; color:#666eb2; font-size:11px; text-align:center; border:1px solid #666eb2; border-radius:2px; background:#eff0f7; box-sizing:border-box;}
+table.ddp-table-form tbody tr td .ddp-txt-long em.ddp-tag-global {position:relative; top:0; right:0; height:20px; width:auto; padding:2px 2px 3px 2px; color:#666eb2; font-size:11px; text-align:center; border:1px solid #666eb2; border-radius:2px; background:#eff0f7; box-sizing:border-box;}
 
 table.ddp-table-form tbody tr td .ddp-txt-long.ddp-global .ddp-icon-global {display:block;}
 
@@ -254,8 +254,8 @@ table.ddp-table-listview tbody tr td span.ddp-sub-name {color:#4b525b; font-size
 table.ddp-table-listview tbody tr:nth-child(odd) td {background-color:#fafafa;}
 
 table.ddp-table-listview tbody tr td span.ddp-box-tag-value {display:inline-block; padding:2px 3px; border-radius:2px;  font-size:12px;}
-table.ddp-table-listview tbody tr td span.ddp-box-tag-value.ddp-dimension {width:70px; border:1px solid #439fe5; text-align:center; color:#439fe5; box-sizing:border-box;}
-table.ddp-table-listview tbody tr td span.ddp-box-tag-value.ddp-measure {width:70px; border:1px solid #5fd7a5;text-align:center;  color:#5fd7a5; box-sizing:border-box;}
+table.ddp-table-listview tbody tr td span.ddp-box-tag-value.ddp-dimension {width:100%; border:1px solid #439fe5; text-align:center; color:#439fe5; box-sizing:border-box;}
+table.ddp-table-listview tbody tr td span.ddp-box-tag-value.ddp-measure {width:100%; border:1px solid #5fd7a5;text-align:center;  color:#5fd7a5; box-sizing:border-box;}
 table.ddp-table-listview tbody tr td em[class*="ddp-icon-type-"] {position:relative; left:0; top:0; margin:0;}
 
 /**************************************************************

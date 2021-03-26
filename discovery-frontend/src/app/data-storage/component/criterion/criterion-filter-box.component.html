@@ -15,9 +15,9 @@
 
 <div class="ddp-form-filtering">
   <div class="ddp-result-filtering" [class.ddp-selected]="isShowList" (click)="onClickShowList($event)">
-    <span class="ddp-txt-label" *ngIf="isEnableFilterTitle()">{{filterTitle}}:</span>
+    <span class="ddp-txt-label" *ngIf="isEnableFilterTitle()">{{filterTitle | translate}}:</span>
     <div class="ddp-box-result">
-      <span class="ddp-txt-result" title="{{selectedItemsLabel}}">{{selectedItemsLabel}}</span>
+      <span class="ddp-txt-result" title="{{selectedItemsLabel}}">{{selectedItemsLabel | translate}}</span>
     </div>
     <!-- popup -->
     <criterion-checkbox-component *ngIf="criterionData && isCheckboxType()"

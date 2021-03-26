@@ -206,7 +206,7 @@
             {{ 'msg.metadata.metadata.detail.ui.created.at' | translate }}
           </th>
           <td>
-            {{ metadata.createdTime | mdate:'YYYY-MM-DD HH:mm' }} <span class="ddp-txt-colortype">by</span> {{ metadata.createdBy.fullName }}
+            {{ metadata.createdTime | mdate:'YYYY-MM-DD HH:mm' }} ({{ metadata.createdBy.fullName }})
           </td>
         </tr>
         <tr>
@@ -214,7 +214,7 @@
             {{ 'msg.metadata.metadata.detail.ui.updated.at' | translate }}
           </th>
           <td>
-            {{ metadata.modifiedTime | mdate:'YYYY-MM-DD HH:mm'  }} <span class="ddp-txt-colortype">by</span> {{ metadata.modifiedBy.fullName }}
+            {{ metadata.modifiedTime | mdate:'YYYY-MM-DD HH:mm'  }} ({{ metadata.modifiedBy.fullName }})
           </td>
         </tr>
         </tbody>

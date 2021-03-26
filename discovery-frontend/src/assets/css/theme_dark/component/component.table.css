@@ -235,11 +235,11 @@
 }
 
 .theme-dark table.ddp-table-form tbody tr td .ddp-txt-long em.ddp-tag-global {
-    position: absolute;
+    position: relative;
     top: 0;
     right: 0;
     height: 20px;
-    width: 60px;
+    width: auto;
     padding: 2px 2px 3px 2px;
     color: #666eb2;
     font-size: 11px;
@@ -1004,7 +1004,7 @@
 }
 
 .theme-dark table.ddp-table-listview tbody tr td span.ddp-box-tag-value.ddp-dimension {
-    width: 70px;
+    width: 100%;
     border: 1px solid #439fe5;
     text-align: center;
     color: #439fe5;
@@ -1012,7 +1012,7 @@
 }
 
 .theme-dark table.ddp-table-listview tbody tr td span.ddp-box-tag-value.ddp-measure {
-    width: 70px;
+    width: 100%;
     border: 1px solid #5fd7a5;
     text-align: center;
     color: #5fd7a5;

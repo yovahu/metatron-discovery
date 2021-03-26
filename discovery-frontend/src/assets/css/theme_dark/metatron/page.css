@@ -13033,7 +13033,7 @@
 
 .theme-dark .ddp-ui-space-option .ddp-ui-space-nav .ddp-data-nav:first-of-type {
     padding-left: 0;
-    max-width: 15%;
+    max-width: 20%;
     white-space: nowrap;
     text-overflow: ellipsis;
     overflow: hidden;
@@ -14017,7 +14017,7 @@
 .theme-dark .ddp-wrap-tab-popup .ddp-ui-title .ddp-ui-rightoption .ddp-type-search {
     position: relative;
     top: 2px;
-    width: 165px;
+    width: 210px;
 }
 
 .theme-dark .ddp-wrap-tab-popup .ddp-ui-title .ddp-ui-rightoption .ddp-label-checkbox {
@@ -17339,7 +17339,7 @@
 
 .theme-dark .ddp-ui-chart-basic .ddp-ui-info {
     display: block;
-    padding: 100px 0 50px 0;
+    padding: 55px 0 55px 0;
     font-size: 22px;
     text-align: center;
     color: #4e5368;
@@ -17363,10 +17363,10 @@
 
 .theme-dark ul.ddp-list-chart-type li a .ddp-txt-name {
     display: block;
-    padding-top: 7px;
     color: #4e5368;
     font-size: 13px;
-    white-space: nowrap;
+    /*padding-top:7px; 
+    white-space:nowrap*/
 }
 
 .theme-dark ul.ddp-list-chart-type li a:hover em[class*="ddp-img-graph-"]:before {
@@ -29887,7 +29887,7 @@
 }
 
 .theme-dark .ddp-wrap-edit .ddp-ui-edit-option a.ddp-btn-toggle.ddp-last {
-    width: 89px;
+    width: auto;
 }
 
 .theme-dark .ddp-wrap-edit .ddp-ui-edit-option .ddp-ui-calen {
@@ -39281,7 +39281,7 @@
 .theme-dark .ddp-ui-filter-order ul.ddp-list-filter-order li span.ddp-box-tag-value,
 .theme-dark table.ddp-table-type2 tr td span.ddp-box-tag-value {
     display: inline-block;
-    width: 70px;
+    width: 85px;
     padding: 2px 3px 1px 3px;
     border-radius: 1px;
     font-size: 12px;
@@ -39497,7 +39497,7 @@
 }
 
 .theme-dark table.ddp-table-form tbody tr td .ddp-td-schema span.ddp-box-tag-value.ddp-dimension {
-    width: 70px;
+    width: 85px;
     text-align: center;
     color: #439fe5;
     border: 1px solid #439fe5;
@@ -39505,7 +39505,7 @@
 }
 
 .theme-dark table.ddp-table-form tbody tr td .ddp-td-schema span.ddp-box-tag-value.ddp-measure {
-    width: 70px;
+    width: 85px;
     text-align: center;
     color: #5fd7a5;
     border: 1px solid #5fd7a5;

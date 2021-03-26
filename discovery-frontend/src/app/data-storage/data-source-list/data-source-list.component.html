@@ -113,7 +113,7 @@
             {{(datasource.connType.toString() == 'ENGINE' ? 'msg.storage.ui.list.ingested.data':'msg.storage.ui.list.linked.data') | translate}}
           </td>
           <td>
-            <span class="{{getSourceStatusIcon(datasource.status)}}">{{getSourceStatusLabel(datasource.status)}}</span>
+            <span class="{{getSourceStatusIcon(datasource.status)}}">{{getSourceStatusLabel(datasource.status) | translate}}</span>
           </td>
           <td class="ddp-data-last">
             {{datasource.createdTime | mdate: 'YYYY-MM-DD HH:mm'}}  <em class="ddp-icon-by">{{'msg.storage.ui.by' | translate}}</em>{{datasource.createdBy.fullName}}

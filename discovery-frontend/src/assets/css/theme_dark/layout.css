@@ -1273,6 +1273,11 @@ textarea:-ms-input-placeholder {color: #a7adb2;}
     color: #7e8aa5;
     font-size: 12px;
 }
+
+.theme-dark .user-guide-buttons { 
+    display: block; margin-left: 19.5px; 
+}
+
 /**************************************************************
     lnb folder
 **************************************************************/

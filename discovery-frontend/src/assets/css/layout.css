@@ -437,6 +437,8 @@ ul.ddp-list-lnb li ul.ddp-list-sublnb li ul.ddp-list-sublnb-2depth li a:hover {b
 .ddp-layout-lnb .ddp-data-help .ddp-label-type {padding:0 0 4px 0; color:rgba(144,150,159,0.6)}
 .ddp-layout-lnb .ddp-data-version { padding:0 23px 17px 23px; color:#90969f; font-size:12px;}
 
+.user-guide-buttons { display: block; margin-left: 19.5px; }
+
     /**************************************************************
         lnb folder
     **************************************************************/

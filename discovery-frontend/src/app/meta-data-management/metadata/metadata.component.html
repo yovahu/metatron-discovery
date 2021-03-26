@@ -158,7 +158,7 @@
         </div>
       </td>
       <td>
-        {{ metadata.modifiedTime | mdate:'YYYY-MM-DD HH:mm' }} by {{ metadata.modifiedBy.fullName }}
+        {{ metadata.modifiedTime | mdate:'YYYY-MM-DD HH:mm' }} ({{ metadata.modifiedBy.fullName }})
         <div class="ddp-btn-control" *ngIf="METADATA_SOURCE_TYPE.ENGINE !== metadata.sourceType">
           <em class="ddp-icon-control-cut" (click)="confirmDelete($event,metadata)"></em>
         </div>
