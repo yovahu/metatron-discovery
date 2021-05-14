@@ -1204,6 +1204,12 @@
       <version>42.0.0</version>
     </dependency>
 
+    <dependency>
+      <groupId>org.neo4j</groupId>
+      <artifactId>neo4j</artifactId>
+      <version>3.5.2</version>
+    </dependency>
+
     <!-- https://github.com/JSQLParser/JSqlParser -->
     <dependency>
       <groupId>com.github.jsqlparser</groupId>

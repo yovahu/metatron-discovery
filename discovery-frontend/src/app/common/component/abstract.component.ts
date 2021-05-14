@@ -509,6 +509,7 @@ export class AbstractComponent implements OnInit, AfterViewInit, OnDestroy, CanC
       {label: 'MySQL', value: 'MYSQL', icon: 'type-mysql'},
       {label: 'PostgreSQL', value: 'POSTGRESQL', icon: 'type-postgre'},
       {label: 'Hive', value: 'HIVE', icon: 'type-hive'},
+      {label: 'Neo4j', value: 'NEO4J', icon: 'type-neo4j'},
       {label: 'Presto', value: 'PRESTO', icon: 'type-presto'},
       {label: 'Druid', value: 'DRUID', icon: 'type-druid'}
       // { label: 'Apache Phoenix', value: 'PHOENIX', icon: 'type-pache' },
@@ -686,6 +687,9 @@ export class AbstractComponent implements OnInit, AfterViewInit, OnDestroy, CanC
         break;
       case ImplementorType.POSTGRESQL:
         connImgUrl = location.origin + '/assets/images/img_db/ic_db_post.png';
+        break;
+      case ImplementorType.NEO4J:
+        connImgUrl = location.origin + '/assets/images/img_db/ic_db_neo4j.png';
         break;
       case ImplementorType.PRESTO:
         connImgUrl = location.origin + '/assets/images/img_db/ic_db_presto.png';
