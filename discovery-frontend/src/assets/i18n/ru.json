@@ -91,6 +91,7 @@
   "msg.comm.menu.manage.prep.flow": "Поток данных",
   "msg.comm.menu.manage.prep.set": "Набор данных",
   "msg.comm.menu.manage.prep.snapshot": "Снимок данных",
+  "msg.comm.menu.manage.prep.graph-analysis": "Анализ данных графа",
   "msg.comm.menu.manage.model": "Блокнот",
   "msg.comm.menu.manage.model.approval": "Утверждение модели",
   "msg.comm.menu.manage.model.notebook": "Notebook сервер",

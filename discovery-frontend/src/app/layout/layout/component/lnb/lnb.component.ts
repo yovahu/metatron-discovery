@@ -188,6 +188,7 @@ export class LNBComponent extends AbstractComponent implements OnInit, OnDestroy
           case '/management/datapreparation/dataflow' :
           case '/management/datapreparation/dataset' :
           case '/management/datapreparation/datasnapshot' :
+          case '/management/datapreparation/graphDataAnalysis' :
             this.depth1Menu1ClickListener('MANAGEMENT');
             this.mgmtMenuClickListener('DATAPREPARATION');
             break;
