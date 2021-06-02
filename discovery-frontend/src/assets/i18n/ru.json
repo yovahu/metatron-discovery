@@ -1154,6 +1154,7 @@
   "msg.dp.th.ss.table": "Таблица",
   "msg.dp.th.ss.valid": "Действительно",
   "msg.dp.ui.ss.select.db": "Выберите базу данных",
+  "msg.dp.th.cm-type": "Метод кластеризации",
   "msg.dp.alert.ss.table.name": "Можно использовать только цифры, алфавит и _.",
   "msg.dp.th.status": "Статус",
   "msg.dp.th.string": "строка",

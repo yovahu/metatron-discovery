@@ -4,7 +4,7 @@ import org.apache.commons.lang3.StringUtils;
 import org.springframework.core.annotation.Order;
 import org.springframework.stereotype.Component;
 
-import java.sql.SQLException;
+import java.sql.*;
 import java.util.List;
 
 import app.metatron.discovery.common.exception.FunctionWithException;
@@ -87,6 +87,25 @@ public class Neo4jDialect implements JdbcDialect {
     public String getConnectUrl(JdbcConnectInformation connectInformation) {
         return makeConnectUrl(connectInformation, connectInformation.getDatabase(), true);
     }
+
+//    try {
+//        Connection connection = DriverManager.getConnection("jdbc:neo4j:bolt://0.0.0.0:7687","neo4j","1999");
+//        connection.setAutoCommit(false);
+//        String query = "CALL gds.labelPropagation.stream('myGraph')\n" +
+//                "YIELD nodeId, communityId AS Community\n" +
+//                "RETURN gds.util.asNode(nodeId).name AS Name, Community\n" +
+//                "ORDER BY Community, Name";
+//        try (PreparedStatement stmt = connection.prepareStatement(query)) {
+//
+//            try (ResultSet rs = stmt.executeQuery()) {
+//                while (rs.next()) {
+//                    System.out.println(rs.getString("Name") + rs.getString("Community"));
+//                }
+//            }
+//        }
+//    } catch (SQLException throwables) {
+//        throwables.printStackTrace();
+//    }
 
     @Override
     public String makeConnectUrl(JdbcConnectInformation connectInformation, String s, boolean b) {
