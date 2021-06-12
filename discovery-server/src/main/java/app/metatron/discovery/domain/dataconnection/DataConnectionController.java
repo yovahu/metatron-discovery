@@ -39,11 +39,8 @@ import org.springframework.web.bind.annotation.RequestMethod;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.ResponseBody;
 
-import java.sql.Connection;
-import java.util.HashMap;
-import java.util.List;
-import java.util.Map;
-import java.util.Set;
+import java.sql.*;
+import java.util.*;
 import java.util.stream.Collectors;
 
 import app.metatron.discovery.common.criteria.ListCriterion;
@@ -748,6 +745,79 @@ public class DataConnectionController {
     );
 
     return ResponseEntity.ok(this.pagedResourcesAssembler.toResource(dataConnections, resourceAssembler));
+  }
+
+  @RequestMapping(value = "/connections/graphs/{connectionId}", method = RequestMethod.GET, produces = "application/json")
+  public @ResponseBody ResponseEntity<?> getGraphNodes(@PathVariable("connectionId") String connectionId) {
+    HashMap<String, Object> response = new HashMap<>();
+    List<String> nodes = new ArrayList<>();
+    List<String> links = new ArrayList<>();
+    DataConnection dataConnection = connectionRepository.findOne(connectionId);
+    try {
+        Connection connection = DriverManager.getConnection(
+                "jdbc:neo4j:bolt://" + dataConnection.hostname + ":" + dataConnection.port,
+                dataConnection.username,
+                dataConnection.password
+        );
+        String queryNodes = "MATCH (n) RETURN n";
+        try (PreparedStatement stmt = connection.prepareStatement(queryNodes)) {
+            try (ResultSet rs = stmt.executeQuery()) {
+                while (rs.next()) {
+                    nodes.add(rs.getString("n"));
+                }
+            }
+        }
+        String queryLinks = "MATCH (n) - [r] - (m) RETURN r";
+        try (PreparedStatement stmt = connection.prepareStatement(queryLinks)) {
+          try (ResultSet rs = stmt.executeQuery()) {
+            while (rs.next()) {
+              links.add(rs.getString("r"));
+            }
+          }
+        }
+        connection.close();
+    } catch (SQLException throwables) {
+        throwables.printStackTrace();
+    }
+    response.put("nodes",nodes);
+    response.put("links",links);
+    return ResponseEntity.ok(response);
+  }
+
+  @RequestMapping(value = "/connections/graphs/scc/{connectionId}", method = RequestMethod.GET, produces = "application/json")
+  public @ResponseBody ResponseEntity<?> sccClusteringGraph(
+          @PathVariable("connectionId") String connectionId)
+  {
+    HashMap<String, Object> response = new HashMap<>();
+    List<String> resultList = new ArrayList<>();
+
+    DataConnection dataConnection = connectionRepository.findOne(connectionId);
+    try {
+        Connection connection = DriverManager.getConnection(
+                "jdbc:neo4j:bolt://" + dataConnection.hostname + ":" + dataConnection.port,
+                dataConnection.username,
+                dataConnection.password
+        );
+      String queryPattern = "CALL gds.alpha.scc.stream({\n" +
+              "  nodeProjection: 'User',\n" +
+              "  relationshipProjection: 'FOLLOW'\n" +
+              "})\n" +
+              "YIELD nodeId, componentId\n" +
+              "RETURN nodeId, componentId AS cluster\n" +
+              "ORDER BY cluster DESC";
+        try (PreparedStatement stmt = connection.prepareStatement(queryPattern)) {
+          try (ResultSet rs = stmt.executeQuery()) {
+            while (rs.next()) {
+              resultList.add("{ \"nodeId\": " + rs.getString("nodeId") + ", \"cluster\":" + rs.getString("cluster") + "}");
+            }
+          }
+        }
+        connection.close();
+    } catch (SQLException throwables) {
+      throwables.printStackTrace();
+    }
+    response.put("scc",resultList);
+    return ResponseEntity.ok(response);
   }
 }
 

@@ -50,6 +50,20 @@ export class DataconnectionService extends AbstractService {
     return this.get(url + '&projection=' + projection);
   }
 
+  public getGraphNodes(connectionId: string, projection: string = 'default'): Promise<any[]> {
+
+    let url = this.API_URL + `connections/graphs/${connectionId}`;
+
+    return this.get(url + '?projection=' + projection);
+  }
+
+  public getClustersScc(connectionId: string, projection: string = 'default'): Promise<any[]> {
+
+    let url = this.API_URL + `connections/graphs/scc/${connectionId}`;
+
+    return this.get(url + '?projection=' + projection);
+  }
+
   // 데이터 커넥션 모든 목록
   public getAllDataconnections(param: any, projection: string = 'list'): Promise<any[]> {
 

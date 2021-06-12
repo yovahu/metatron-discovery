@@ -25,6 +25,19 @@ export class D3Service {
     svg.call(zoom);
   }
 
+  applyMouseoverBehavior(element, node: Node, graph: ForceDirectedGraph) {
+    const d3element = d3.select(element);
+
+    function mouseover(d) {
+      // d is the node object
+      // You can even get mouse position with this command
+      console.log(node)
+      var mousePos = d3.mouse(this);
+    }
+
+    d3element.on("mouseover", mouseover)
+  }
+
   /** A method to bind a draggable behaviour to an svg element */
   applyDraggableBehaviour(element, node: Node, graph: ForceDirectedGraph) {
     const d3element = d3.select(element);
@@ -34,7 +47,7 @@ export class D3Service {
       d3.event.sourceEvent.stopPropagation();
 
       if (!d3.event.active) {
-        graph.simulation.alphaTarget(0.3).restart();
+        graph.simulation.alphaTarget(0.08).restart();
       }
 
       d3.event.on('drag', dragged).on('end', ended);
@@ -58,9 +71,7 @@ export class D3Service {
       .on('start', started));
   }
 
-  /** The interactable graph we will simulate in this article
-   * This method does not interact with the document, purely physical calculations with d3
-   */
+
   getForceDirectedGraph(nodes: Node[], links: Link[], options: { width, height }) {
     const sg = new ForceDirectedGraph(nodes, links, options);
     return sg;

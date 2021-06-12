@@ -11,21 +11,35 @@ export class Node implements d3.SimulationNodeDatum {
   fx?: number | null;
   fy?: number | null;
 
-  id: string;
-  group: string;
+  id: string | number;
+  nodeClass: string;
+  graph: string | number;
+
+  cluster: number = null;
+  spPath: number;
+
   linkCount: number = 0;
 
-  constructor(id, group) {
+  constructor(id, nodeClass, graph) {
     this.id = id;
-    this.group = group;
+    this.nodeClass = nodeClass;
+    this.graph = graph;
   }
 
   normal = () => {
     return Math.sqrt(this.linkCount / APP_CONFIG.N);
   }
 
+  get graphNumber() {
+    return this.graph;
+  }
+
   get r() {
-    // return 50 * this.normal() + 10;
+    // return this.linkCount * 30;
+    return 30;
+  }
+
+  get uds() {
     return 30;
   }
 
@@ -35,7 +49,7 @@ export class Node implements d3.SimulationNodeDatum {
   }
 
   get color() {
-    let index = this.group;
+    let index = this.cluster;
     return APP_CONFIG.SPECTRUM[index];
   }
 }
