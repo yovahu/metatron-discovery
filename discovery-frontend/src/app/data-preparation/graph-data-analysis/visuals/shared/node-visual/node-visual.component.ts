@@ -8,6 +8,7 @@ import { Node } from '../../../d3';
       <svg:circle
           class="node"
           [attr.fill]="node.color"
+          [attr.stroke]="node.color"
           cx="0"
           cy="0"
           [attr.r]="node.r">
@@ -15,7 +16,7 @@ import { Node } from '../../../d3';
       <svg:text
           class="node-name"
           [attr.font-size]="node.fontSize">
-        {{node.id}}
+        {{node.name}}
       </svg:text>
     </svg:g>
   `,

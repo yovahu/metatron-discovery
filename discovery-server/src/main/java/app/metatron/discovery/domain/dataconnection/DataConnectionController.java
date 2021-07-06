@@ -752,6 +752,8 @@ public class DataConnectionController {
     HashMap<String, Object> response = new HashMap<>();
     List<String> nodes = new ArrayList<>();
     List<String> links = new ArrayList<>();
+    String countNodes = "";
+    String countLinks = "";
     DataConnection dataConnection = connectionRepository.findOne(connectionId);
     try {
         Connection connection = DriverManager.getConnection(
@@ -775,12 +777,30 @@ public class DataConnectionController {
             }
           }
         }
+      String queryCountNodes = "MATCH (n) RETURN count(n) as countN";
+      try (PreparedStatement stmt = connection.prepareStatement(queryCountNodes)) {
+        try (ResultSet rs = stmt.executeQuery()) {
+          while (rs.next()) {
+            countNodes = rs.getString("countN");
+          }
+        }
+      }
+      String queryCountLinks = "MATCH (n) - [r] - (m) RETURN count(n) as countL";
+      try (PreparedStatement stmt = connection.prepareStatement(queryCountLinks)) {
+        try (ResultSet rs = stmt.executeQuery()) {
+          while (rs.next()) {
+            countLinks = rs.getString("countL");
+          }
+        }
+      }
         connection.close();
     } catch (SQLException throwables) {
         throwables.printStackTrace();
     }
     response.put("nodes",nodes);
     response.put("links",links);
+    response.put("countNodes",countNodes);
+    response.put("countLinks",countLinks);
     return ResponseEntity.ok(response);
   }
 
@@ -819,5 +839,39 @@ public class DataConnectionController {
     response.put("scc",resultList);
     return ResponseEntity.ok(response);
   }
+
+  @RequestMapping(value = "/connections/graphs/pagerank/{connectionId}", method = RequestMethod.GET, produces = "application/json")
+  public @ResponseBody ResponseEntity<?> pageranking(
+          @PathVariable("connectionId") String connectionId)
+  {
+    HashMap<String, Object> response = new HashMap<>();
+    List<String> resultList = new ArrayList<>();
+
+    DataConnection dataConnection = connectionRepository.findOne(connectionId);
+    try {
+      Connection connection = DriverManager.getConnection(
+              "jdbc:neo4j:bolt://" + dataConnection.hostname + ":" + dataConnection.port,
+              dataConnection.username,
+              dataConnection.password
+      );
+      String queryPattern = "CALL gds.pageRank.stream('myGraph')\n" +
+              "YIELD nodeId, score\n" +
+              "RETURN nodeId, score\n" +
+              "ORDER BY score DESC, nodeId ASC";
+      try (PreparedStatement stmt = connection.prepareStatement(queryPattern)) {
+        try (ResultSet rs = stmt.executeQuery()) {
+          while (rs.next()) {
+            resultList.add("{ \"nodeId\": " + rs.getString("nodeId") + ", \"score\":" + rs.getString("score") + "}");
+          }
+        }
+      }
+      connection.close();
+    } catch (SQLException throwables) {
+      throwables.printStackTrace();
+    }
+    response.put("pagerank",resultList);
+    return ResponseEntity.ok(response);
+  }
+
 }
 
