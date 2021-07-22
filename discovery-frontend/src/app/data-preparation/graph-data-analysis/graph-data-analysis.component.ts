@@ -4,7 +4,6 @@ import {AbstractComponent} from "../../common/component/abstract.component";
 import {CmType, RType, SpType} from '../../domain/data-preparation/pr-graph-data-analysis';
 import {DataconnectionService} from '../../dataconnection/service/dataconnection.service';
 import {Link, Node} from './d3';
-import {Alert} from "../../common/util/alert.util";
 
 @Component({
   selector: 'app-graph-data-analysis',
@@ -22,11 +21,9 @@ export class GraphDataAnalysisComponent extends AbstractComponent implements OnI
 
   public cmType : string;
   public spType: SpType;
-  public rType: string;
+  public rType: RType;
 
-  public currentDB : {label: string, value: string} = {label: '', value: ''};
-  public countNodes : string = '';
-  public countLinks : string = '';
+  public currentDB : string;
   public dbSelected : boolean = false;
 
   constructor(private connectionService: DataconnectionService,
@@ -98,10 +95,10 @@ export class GraphDataAnalysisComponent extends AbstractComponent implements OnI
   }
 
   public async getGraphNodes() {
-    await this.connectionService.getGraphNodes(this.currentDB.value).then(async (result)=>{
+    await this.connectionService.getGraphNodes(this.currentDB).then(async (result)=>{
        await result['nodes'].forEach(e => {
         let node = JSON.parse(e);
-        this.nodes.push(new Node(node._id, node.name, node._labels[0], node.graph))
+        this.nodes.push(new Node(node._id, node._labels[0], node.graph))
       })
       result['links'].forEach(e => {
         let link = JSON.parse(e);
@@ -112,41 +109,24 @@ export class GraphDataAnalysisComponent extends AbstractComponent implements OnI
           }
         })
       })
-      this.countNodes = result['countNodes'];
-      this.countLinks = result['countLinks'];
     })
-  }
-
-  public lol(){
-    this.loadingShow();
-    setTimeout(() => {
-      this.loadingHide();
-      Alert.success("Результаты сохранены")
-    },1000)
-  }
-
-  public onChangeRangingMethods(data: RangingMethods) {
-    this.rType = data.label;
-    if (this.rType === 'Не выбрано') {
-      this.nodes.forEach(e => e.radius = 50);
-    } else {
-      this.connectionService.getPagerank(this.currentDB.value).then((result)=>{
-        let response = result['pagerank'].map(e => {
-          return JSON.parse(e)
-        });
-        response.forEach(e => {
-          this.nodes.forEach(n => {
-            if(e.nodeId === n.id){
-              n.radius = (e.score / 3 + 1) * 25;
-            }
-          })
-        })
-      });
-    }
+    console.log(this.nodes)
   }
 
   public onChangeShortestPathMethod(data: ShortestPathMethod) {
-    Alert.info("Выберите пару вершин")
+    this.spType = data.value;
+    console.log(this.nodes[3].color);
+    this.nodes[3].graph = 8;
+    this.nodes[15].graph = 8;
+    this.nodes[0].graph = 8;
+    this.nodes[1].graph = 8;
+    this.nodes[2].graph = 8;
+    this.nodes[16].graph = 8;
+    this.nodes[25].graph = 8;
+    this.nodes[12].graph = 8;
+    this.nodes[13].graph = 8;
+    this.nodes[14].graph = 8;
+    this.nodes[10].graph = 8;
   }
 
   public onChangeClusteringMethod(data: ClusteringMethod) {
@@ -190,14 +170,11 @@ export class GraphDataAnalysisComponent extends AbstractComponent implements OnI
     }
 
     if (this.cmType === 'Не выбрано') {
-      this.nodes.forEach(e => {
-        e.cluster = null
-        e.colorInd = null
-      });
+      this.nodes.forEach(e => e.cluster = null);
     }
 
     if (this.cmType === 'SCC') {
-      this.connectionService.getClustersScc(this.currentDB.value).then((result)=>{
+      this.connectionService.getClustersScc(this.currentDB).then((result)=>{
 
         let response = result['scc'].map(e => {
           return JSON.parse(e)
@@ -211,8 +188,8 @@ export class GraphDataAnalysisComponent extends AbstractComponent implements OnI
     }
   }
 
-  public async onChangeCurrentDB(data: {label: string, value: string}) {
-    this.currentDB = {label: data.label, value: data.value};
+  public async onChangeCurrentDB(data: {label: string; value: string;}) {
+    this.currentDB = data.value;
     if(data.value === null) {
       alert(1);
     } else {
