@@ -13,21 +13,26 @@ export class Node implements d3.SimulationNodeDatum {
 
   id: string | number;
   nodeClass: string;
+  name: string;
+  radius: number = 50;
   graph: string | number;
 
   cluster: number = null;
-  spPath: number;
+  spPath: number = null;
+
+  colorInd: number = null;
 
   linkCount: number = 0;
 
-  constructor(id, nodeClass, graph) {
+  constructor(id, name, nodeClass, graph) {
     this.id = id;
+    this.name = name;
     this.nodeClass = nodeClass;
     this.graph = graph;
   }
 
   normal = () => {
-    return Math.sqrt(this.linkCount / APP_CONFIG.N);
+    return Math.sqrt(this.radius / APP_CONFIG.N);
   }
 
   get graphNumber() {
@@ -35,8 +40,7 @@ export class Node implements d3.SimulationNodeDatum {
   }
 
   get r() {
-    // return this.linkCount * 30;
-    return 30;
+    return this.radius;
   }
 
   get uds() {
@@ -45,11 +49,17 @@ export class Node implements d3.SimulationNodeDatum {
 
   get fontSize() {
     // return (30 * this.normal() + 10) + 'px';
-    return 20;
+    return 25 * this.normal() + 'px';
   }
 
   get color() {
-    let index = this.cluster;
-    return APP_CONFIG.SPECTRUM[index];
+    if(this.cluster !== null) {
+      this.colorInd = this.cluster;
+    }
+    return APP_CONFIG.SPECTRUM[this.colorInd];
+  }
+
+  set color(col) {
+    this.colorInd = APP_CONFIG.SPECTRUM[col];
   }
 }

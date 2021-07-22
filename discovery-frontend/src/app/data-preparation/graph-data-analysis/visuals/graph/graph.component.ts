@@ -9,6 +9,7 @@ import {
 } from '@angular/core';
 import {D3Service, ForceDirectedGraph} from '../../d3';
 import {AbstractComponent} from "../../../../common/component/abstract.component";
+import * as d3 from "d3";
 
 @Component({
   selector: 'graph',
@@ -16,12 +17,12 @@ import {AbstractComponent} from "../../../../common/component/abstract.component
   template: `
     <svg #svg [attr.width]="_options.width" [attr.height]="_options.height">
       <g [zoomableOf]="svg">
-        <defs>
-          <marker id="arrowhead" viewBox="0 -5 10 10" refX="40" refY="0" orient="auto"
-          markerWidth="20" markerHeight="20" markerUnits="strokeWidth" overflow="visible">
-            <path d="M0,-5L10,0L0,5" fill="#ccc"></path>
-          </marker>
-        </defs>
+<!--        <defs>-->
+<!--          <marker id="arrowhead" viewBox="0 -5 10 10" refX="40" refY="0" orient="auto"-->
+<!--          markerWidth="20" markerHeight="20" markerUnits="strokeWidth" overflow="visible">-->
+<!--            <path d="M0,-5L10,0L0,5" fill="#ccc"></path>-->
+<!--          </marker>-->
+<!--        </defs>-->
         <g [linkVisual]="link" *ngFor="let link of links"></g>
         <g [nodeVisual]="node" *ngFor="let node of nodes"
             [draggableNode]="node" [draggableInGraph]="graph"></g>
@@ -34,6 +35,7 @@ export class GraphComponent extends AbstractComponent implements OnInit, AfterVi
   @Input('nodes') nodes;
   @Input('links') links;
   @Input('cmType') cmType;
+  @Input('rType') rType;
 
   graph: ForceDirectedGraph;
   _options: { width, height } = { width: 800, height: 600 };
@@ -43,13 +45,17 @@ export class GraphComponent extends AbstractComponent implements OnInit, AfterVi
     this.graph.initSimulation(this.options);
   }
 
+  nodeR(d){
+    return this.nodes[d.target].radius + 10;
+  }
+
   constructor(private d3Service: D3Service, protected injector: Injector,  protected elementRef: ElementRef, private ref: ChangeDetectorRef) {
     super(elementRef, injector);
   }
 
   ngOnChanges(changes: SimpleChanges) {
 
-    if(changes.cmType.currentValue != null) {
+    if(this.graph != null) {
 
       this.graph.updateGraph();
 

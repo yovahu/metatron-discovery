@@ -27,15 +27,23 @@ export class D3Service {
 
   applyMouseoverBehavior(element, node: Node, graph: ForceDirectedGraph) {
     const d3element = d3.select(element);
-
-    function mouseover(d) {
+    let i = 0;
+    function mouseover() {
+      i++;
       // d is the node object
       // You can even get mouse position with this command
+      if (i >= 2) {
+        node.colorInd = null;
+        i = 0;
+      } else {
+        node.spPath = 99;
+        var mousePos = d3.mouse(this);
+      }
       console.log(node)
-      var mousePos = d3.mouse(this);
+      console.log(i)
     }
 
-    d3element.on("mouseover", mouseover)
+    d3element.on("click", mouseover)
   }
 
   /** A method to bind a draggable behaviour to an svg element */
