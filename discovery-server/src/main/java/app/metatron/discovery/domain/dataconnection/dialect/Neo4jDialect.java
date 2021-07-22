@@ -1,21 +1,20 @@
 package app.metatron.discovery.domain.dataconnection.dialect;
 
 import org.apache.commons.lang3.StringUtils;
+import app.metatron.discovery.common.exception.FunctionWithException;
+import app.metatron.discovery.extension.dataconnection.jdbc.JdbcConnectInformation;
+import app.metatron.discovery.extension.dataconnection.jdbc.dialect.JdbcDialect;
 import org.springframework.core.annotation.Order;
 import org.springframework.stereotype.Component;
 
 import java.sql.SQLException;
 import java.util.List;
 
-import app.metatron.discovery.common.exception.FunctionWithException;
-import app.metatron.discovery.extension.dataconnection.jdbc.JdbcConnectInformation;
-import app.metatron.discovery.extension.dataconnection.jdbc.dialect.JdbcDialect;
-
 @Order(3)
 @Component
 public class Neo4jDialect implements JdbcDialect {
 
-  private static final String NEO4J_URL_PREFIX = "jdbc:neo4j:bolt:/";
+  private static final String NEO4J_URL_PREFIX = "bolt:/";
 
     @Override
     public String getName() {
@@ -70,17 +69,17 @@ public class Neo4jDialect implements JdbcDialect {
 
     @Override
     public String getDriverClass(JdbcConnectInformation jdbcConnectInformation) {
-        return "org.neo4j.driver.v1.Driver";
+        return "org.neo4j.driver";
     }
 
     @Override
     public String getConnectorClass(JdbcConnectInformation jdbcConnectInformation) {
-        return "app.metatron.discovery.domain.dataconnection.connector.Neo4jJdbcConnector";
+        return null;
     }
 
     @Override
     public String getDataAccessorClass(JdbcConnectInformation jdbcConnectInformation) {
-        return "app.metatron.discovery.domain.dataconnection.accessor.Neo4jDataAccessor";
+        return null;
     }
 
     @Override
@@ -105,13 +104,20 @@ public class Neo4jDialect implements JdbcDialect {
         if(connectInformation.getPort() != null) {
           builder.append(":").append(connectInformation.getPort());
         }
-        System.out.println(builder.toString());
+
+        builder.append("/");
+
+        // Set DataBase
+        if(StringUtils.isNotEmpty(connectInformation.getDatabase())) {
+          builder.append(connectInformation.getDatabase());
+        }
+
         return builder.toString();
     }
 
     @Override
     public String getTestQuery(JdbcConnectInformation jdbcConnectInformation) {
-        return "MATCH (N) RETURN N";
+        return null;
     }
 
     @Override
