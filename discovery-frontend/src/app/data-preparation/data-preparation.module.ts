@@ -89,11 +89,6 @@ import {DataconnectionService} from "../dataconnection/service/dataconnection.se
 import {DataflowDetail2Component} from "./dataflow/dataflow-detail/dataflow-detail2.component";
 import {DataStorageShareModule} from "../data-storage/data-storage-share.module";
 import {GraphDataAnalysisComponent} from "./graph-data-analysis/graph-data-analysis.component";
-import { FormsModule } from '@angular/forms';
-import { HttpModule } from '@angular/http';
-import { D3Service, D3_DIRECTIVES } from './graph-data-analysis/d3';
-import { GraphComponent } from './graph-data-analysis/visuals/graph/graph.component';
-import { SHARED_VISUALS } from './graph-data-analysis/visuals/shared';
 
 
 const dataPreparationRoutes: Routes = [
@@ -116,14 +111,9 @@ const dataPreparationRoutes: Routes = [
     SplitPaneModule,
     WorkbenchEditorModule,
     DataSourceCreateModule,
-    DataStorageShareModule,
-    FormsModule,
-    HttpModule
+    DataStorageShareModule
   ],
   declarations: [
-    GraphComponent,
-    ...SHARED_VISUALS,
-    ...D3_DIRECTIVES,
     GraphDataAnalysisComponent,
     DataPreparationComponent,
     DataflowComponent,
@@ -195,13 +185,9 @@ const dataPreparationRoutes: Routes = [
     DatasetService,
     DataPreparationGuard,
     DataflowModelService,
-    DataconnectionService,
-    D3Service
+    DataconnectionService
   ],
   exports: [
-  ],
-  bootstrap: [
-    GraphDataAnalysisComponent
   ]
 })
 export class DataPreparationModule { }
