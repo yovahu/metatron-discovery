@@ -123,7 +123,7 @@ export class MapChartComponent extends BaseChart implements AfterViewInit {
   public olmap: any = undefined;
 
   // OSM Layer
-  public  osmLayer = new ol.layer.Tile({
+  public osmLayer = new ol.layer.Tile({
     preload: Infinity,
     source: new ol.source.OSM({
       attributions: this.attribution(),

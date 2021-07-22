@@ -59,7 +59,7 @@
              <component-select
                [array]="rangingMethods"
                [viewKey]="'label'"
-               (onSelected)="onChangeRangingMethods($event)">
+               (onSelected)="onChangeShortestPathMethod($event)">
              </component-select>
              <!-- //selectbox -->
            </div>
@@ -80,47 +80,9 @@
            </div>
            <!-- //edit option -->
          </div>
-
-
        </div>
      </div>
-     <div class="ddp-wrap-datadetail ddp-type" style="padding: 60px 0 0 0;">
-       <div class="ddp-info-left">
-         <div class="ddp-ui-datadetail">
-           <label class="ddp-label-detail">Информация о графе</label>
-           <table class="ddp-table-detail">
-             <colgroup>
-               <col width="150px">
-               <col width="*">
-             </colgroup>
-             <tbody>
-             <tr>
-               <th>Идентификатор графа</th>
-               <td>{{currentDB.value}}</td>
-             </tr>
-             <tr>
-               <th>Название графа</th>
-               <td>{{currentDB.label}}</td>
-             </tr>
-             <tr>
-               <th>Количество вершин</th>
-               <td>{{countNodes}}</td>
-             </tr>
-             <tr>
-               <th>Количество связей</th>
-               <td>{{countLinks}}</td>
-             </tr>
-             </tbody>
-           </table>
-           <a class="ddp-link-board-add" href="javascript:" (click)="lol()">
-             Сохранить результаты
-           </a>
-         </div>
-       </div>
-       <div class="ddp-info-right">
-         <graph *ngIf="dbSelected" [nodes]="nodes" [links]="links" [cmType]="cmType" [rType]="rType"></graph>
-       </div>
-     </div>
-
+     <!--//options-->
+     <graph *ngIf="dbSelected" [nodes]="nodes" [links]="links" [cmType]="cmType"></graph>
   </div>
 </div>

@@ -64,13 +64,6 @@ export class DataconnectionService extends AbstractService {
     return this.get(url + '?projection=' + projection);
   }
 
-  public getPagerank(connectionId: string, projection: string = 'default'): Promise<any[]> {
-
-    let url = this.API_URL + `connections/graphs/pagerank/${connectionId}`;
-
-    return this.get(url + '?projection=' + projection);
-  }
-
   // 데이터 커넥션 모든 목록
   public getAllDataconnections(param: any, projection: string = 'list'): Promise<any[]> {
 
