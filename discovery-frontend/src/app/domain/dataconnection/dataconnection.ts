@@ -105,7 +105,6 @@ export enum ImplementorType {
   DRUID = 'DRUID',
   FILE = 'FILE',
   NONE = 'NONE',
-  NEO4J = 'NEO4J',
   // only used in UI
   ALL = 'ALL'
 }

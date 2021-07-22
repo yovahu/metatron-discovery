@@ -52,7 +52,6 @@ export class StorageService extends AbstractService {
     return new Promise((resolve, reject) => {
       this.get(this.API_URL + 'extensions/connection').then(result => {
         StorageService.connectionTypeList = result;
-        console.log(StorageService.connectionTypeList);
         resolve(result);
       }).catch(error => {
         StorageService.connectionTypeList = [];
