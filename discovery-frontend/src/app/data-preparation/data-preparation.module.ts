@@ -88,7 +88,6 @@ import {DataSourceCreateModule} from "../data-storage/data-source-list/create-da
 import {DataconnectionService} from "../dataconnection/service/dataconnection.service";
 import {DataflowDetail2Component} from "./dataflow/dataflow-detail/dataflow-detail2.component";
 import {DataStorageShareModule} from "../data-storage/data-storage-share.module";
-import {GraphDataAnalysisComponent} from "./graph-data-analysis/graph-data-analysis.component";
 
 
 const dataPreparationRoutes: Routes = [
@@ -99,8 +98,7 @@ const dataPreparationRoutes: Routes = [
   { path: 'dataset', component: DatasetComponent },
   { path: 'dataset/new', component: DatasetComponent },
   { path: 'dataset/:id', component: DatasetDetailComponent },
-  { path: 'datasnapshot', component: DataSnapshotComponent },
-  { path: 'graphDataAnalysis', component: GraphDataAnalysisComponent }
+  { path: 'datasnapshot', component: DataSnapshotComponent }
 ];
 
 @NgModule({
@@ -114,7 +112,6 @@ const dataPreparationRoutes: Routes = [
     DataStorageShareModule
   ],
   declarations: [
-    GraphDataAnalysisComponent,
     DataPreparationComponent,
     DataflowComponent,
     DatasetComponent,

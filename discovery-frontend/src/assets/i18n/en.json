@@ -91,7 +91,6 @@
   "msg.comm.menu.manage.prep.flow": "Dataflow",
   "msg.comm.menu.manage.prep.set": "Dataset",
   "msg.comm.menu.manage.prep.snapshot": "Data Snapshot",
-  "msg.comm.menu.manage.prep.graph-analysis": "Graph data analysis",
   "msg.comm.menu.manage.model": "Notebook",
   "msg.comm.menu.manage.model.approval": "Model Approval",
   "msg.comm.menu.manage.model.notebook": "Notebook Server",
