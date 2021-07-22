@@ -88,6 +88,25 @@ public class Neo4jDialect implements JdbcDialect {
         return makeConnectUrl(connectInformation, connectInformation.getDatabase(), true);
     }
 
+//    try {
+//        Connection connection = DriverManager.getConnection("jdbc:neo4j:bolt://0.0.0.0:7687","neo4j","1999");
+//        connection.setAutoCommit(false);
+//        String query = "CALL gds.labelPropagation.stream('myGraph')\n" +
+//                "YIELD nodeId, communityId AS Community\n" +
+//                "RETURN gds.util.asNode(nodeId).name AS Name, Community\n" +
+//                "ORDER BY Community, Name";
+//        try (PreparedStatement stmt = connection.prepareStatement(query)) {
+//
+//            try (ResultSet rs = stmt.executeQuery()) {
+//                while (rs.next()) {
+//                    System.out.println(rs.getString("Name") + rs.getString("Community"));
+//                }
+//            }
+//        }
+//    } catch (SQLException throwables) {
+//        throwables.printStackTrace();
+//    }
+
     @Override
     public String makeConnectUrl(JdbcConnectInformation connectInformation, String s, boolean b) {
         if(StringUtils.isNotEmpty(connectInformation.getUrl())) {
@@ -111,7 +130,7 @@ public class Neo4jDialect implements JdbcDialect {
 
     @Override
     public String getTestQuery(JdbcConnectInformation jdbcConnectInformation) {
-        return "MATCH (N) RETURN N LIMIT 10";
+        return "MATCH (N) RETURN N";
     }
 
     @Override

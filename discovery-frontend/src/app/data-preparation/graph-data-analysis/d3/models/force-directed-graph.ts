@@ -3,10 +3,10 @@ import { Link } from './link';
 import { Node } from './node';
 import * as d3 from 'd3';
 
-export const FORCES = {
-  LINKS: 1 / 10,
+const FORCES = {
+  LINKS: 1 / 50,
   COLLISION: 1,
-  CHARGE: -50
+  CHARGE: -1
 }
 
 export class ForceDirectedGraph {
@@ -15,7 +15,6 @@ export class ForceDirectedGraph {
 
   public nodes: Node[] = [];
   public links: Link[] = [];
-  public chargeValue = FORCES.CHARGE;
 
   constructor(nodes, links, options: { width, height }) {
     this.nodes = nodes;
@@ -24,22 +23,14 @@ export class ForceDirectedGraph {
     this.initSimulation(options);
   }
 
-  updateGraph() {
-    this.simulation.stop();
-    this.simulation.alphaTarget(1).restart();
-    setTimeout(() => {
-      this.simulation.alphaTarget(0);
-    },150)
-  }
-
-  connectNodes(source, target, graph) {
+  connectNodes(source, target) {
     let link;
 
     if (!this.nodes[source] || !this.nodes[target]) {
       throw new Error('One of the nodes does not exist');
     }
 
-    link = new Link(source, target, graph);
+    link = new Link(source, target);
     this.simulation.stop();
     this.links.push(link);
     this.simulation.alphaTarget(0.3).restart();
@@ -63,8 +54,7 @@ export class ForceDirectedGraph {
     this.simulation.force('links',
       d3.forceLink(this.links)
         .id(d => d['id'])
-        .distance(125)
-        // .strength(FORCES.LINKS)
+        .strength(FORCES.LINKS)
     );
   }
 
@@ -78,13 +68,15 @@ export class ForceDirectedGraph {
       const ticker = this.ticker;
 
       this.simulation = d3.forceSimulation()
-        .force('charge', d3.forceManyBody()
-          .strength(d => this.chargeValue * d['uds']))
-        .force('collide', d3.forceCollide()
-          .strength(FORCES.COLLISION)
-          .radius(d => d['r'] + 15).iterations(2))
-        .force('x', d3.forceX().x(d => d['graphNumber'] * 500))
-        .force('y', d3.forceY().y(0))
+        .force('charge',
+          d3.forceManyBody()
+            .strength(d => FORCES.CHARGE * d['r'])
+        )
+        .force('collide',
+          d3.forceCollide()
+            .strength(FORCES.COLLISION)
+            .radius(d => d['r'] + 45).iterations(2)
+        );
 
       // Connecting the d3 ticker to an angular event emitter
       this.simulation.on('tick', function () {

@@ -900,16 +900,4 @@ public class JdbcConnectionService {
     return extensionInfo;
   }
 
-  public Object getGraphData(DataConnection jdbcDataConnection) {
-    Map<String, Object> extensionInfo = new HashMap<>();
-    extensionInfo.put("implementor", jdbcDataConnection.getImplementor());
-
-//    try{
-//      JdbcDialect dialect = DataConnectionHelper.lookupDialect(jdbcDataConnection);
-//      extensionInfo.put()
-//    }
-
-    return extensionInfo;
-  }
-
 }
