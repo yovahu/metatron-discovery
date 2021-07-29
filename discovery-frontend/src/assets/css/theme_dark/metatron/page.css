@@ -17365,7 +17365,7 @@
     display: block;
     color: #4e5368;
     font-size: 13px;
-    /*padding-top:7px; 
+    /*padding-top:7px;
     white-space:nowrap*/
 }
 
@@ -44685,7 +44685,6 @@
     display: inline-block;
     width: 278px;
     height: 35px;
-    background: url(../../../images/logo_login.png) no-repeat;
 }
 
 .theme-dark .ddp-sso-loading em.ddp-icon-logo .st0 {

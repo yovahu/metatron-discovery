@@ -31,7 +31,7 @@
   "msg.sso.ui.not.matched.userip": "Доступ с других IP-адресов и ограничение доступа.",
   "msg.sso.ui.confirm.userip": "Вы подключаетесь с другого IP-адреса ({{value}}). Хотите продолжить вход в систему?",
   "msg.sso.ui.loading": "Подождите, страница загружается",
-  "msg.sso.ui.welcome.title": "Добро пожаловать в Metatron Discovery!",
+  "msg.sso.ui.welcome.title": "Добро пожаловать!",
   "msg.sso.ui.welcome.desc1": "Metatron Discovery обеспечивает визуализацию в реальном времени на основе анализа больших данных.",
   "msg.sso.ui.welcome.desc2": "Создайте свою первую диаграмму в личной рабочей области.",
   "msg.sso.btn.continue-app": "Создайте свою первую диаграмму в личной рабочей области.",
