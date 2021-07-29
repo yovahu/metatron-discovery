@@ -13,30 +13,35 @@
  */
 
 import * as _ from 'lodash';
-import {Component, ElementRef, Injector, Input, OnInit, ViewChild} from '@angular/core';
-import {Field, FieldRole} from '../../../domain/datasource/datasource';
+
+import {AfterViewInit, Component, ElementRef, Injector, OnDestroy, OnInit, ViewChild} from '@angular/core';
+
+import {PopupService} from '@common/service/popup.service';
+import {SubscribeArg} from '@common/domain/subscribe-arg';
+import {CommonConstant} from '@common/constant/common.constant';
+
+import {Field, FieldRole} from '@domain/datasource/datasource';
+import {ByTimeUnit, TimeUnit} from '@domain/workbook/configurations/field/timestamp-field';
+import {TimeFilter} from '@domain/workbook/configurations/filter/time-filter';
+import {TimeRangeFilter} from '@domain/workbook/configurations/filter/time-range-filter';
+import {TimeRelativeFilter} from '@domain/workbook/configurations/filter/time-relative-filter';
+import {TimeListFilter} from '@domain/workbook/configurations/filter/time-list-filter';
+import {Filter} from '@domain/workbook/configurations/filter/filter';
+
+import {FilterUtil} from '../../util/filter.util';
 import {AbstractFilterPanelComponent} from '../abstract-filter-panel.component';
-import {ByTimeUnit, TimeUnit} from '../../../domain/workbook/configurations/field/timestamp-field';
+import {TimeUnitSelectResult} from '../component/timeUnit-select.component';
 import {TimeListFilterComponent} from './time-list-filter.component';
 import {TimeRelativeFilterComponent} from './time-relative-filter.component';
 import {TimeRangeFilterComponent} from './time-range-filter.component';
-import {TimeFilter} from '../../../domain/workbook/configurations/filter/time-filter';
-import {FilterUtil} from '../../util/filter.util';
-import {TimeRangeFilter} from '../../../domain/workbook/configurations/filter/time-range-filter';
-import {TimeRelativeFilter} from '../../../domain/workbook/configurations/filter/time-relative-filter';
-import {TimeListFilter} from '../../../domain/workbook/configurations/filter/time-list-filter';
-import {isNullOrUndefined} from "util";
-import {Filter} from '../../../domain/workbook/configurations/filter/filter';
-import {PopupService} from '../../../common/service/popup.service';
-import {SubscribeArg} from '../../../common/domain/subscribe-arg';
-import {CommonConstant} from "../../../common/constant/common.constant";
-import {TimeUnitSelectResult} from "../component/timeUnit-select.component";
+import {TimeDateFilterComponent} from "./time-date-filter.component";
+import {TimeDateFilter} from "@domain/workbook/configurations/filter/time-date-filter";
 
 @Component({
   selector: 'time-filter-panel',
   templateUrl: './time-filter-panel.component.html'
 })
-export class TimeFilterPanelComponent extends AbstractFilterPanelComponent implements OnInit {
+export class TimeFilterPanelComponent extends AbstractFilterPanelComponent<TimeFilter> implements OnInit, AfterViewInit, OnDestroy {
 
   /*-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=
    | Private Variables
@@ -53,10 +58,14 @@ export class TimeFilterPanelComponent extends AbstractFilterPanelComponent imple
   @ViewChild(TimeListFilterComponent)
   private _listComp: TimeListFilterComponent;
 
+  @ViewChild(TimeDateFilterComponent)
+  private _dateComp: TimeDateFilterComponent;
+
   // 임시 값을 저장하기 위한 변수
   private _tempRelativeFilter:TimeRelativeFilter;
   private _tempRangeFilter:TimeRangeFilter;
   private _tempListFilter:TimeListFilter;
+  private _tempSingleFilter:TimeDateFilter;
 
   /*-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=
    | Protected Variables
@@ -65,10 +74,6 @@ export class TimeFilterPanelComponent extends AbstractFilterPanelComponent imple
   /*-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=
    | Public Variables
    |-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=*/
-
-  // 필터
-  public filter: TimeFilter;
-
   public isTimeStamp = false;
 
   public isContinuousByAll: boolean = false;      // Granularity 가 지정되지 않은 연속성 여부 판단
@@ -77,7 +82,7 @@ export class TimeFilterPanelComponent extends AbstractFilterPanelComponent imple
   public isRelativeType: boolean = false;         // Relative Time Filter
   public isRangeType: boolean = false;            // Range Time Filter
   public isListType: boolean = false;             // List Time Filter
-  public isNewFilter:boolean = false;
+  public isSingleType: boolean = false;
 
   public dpContinuousList: string[] = ['Second', 'Minute', 'Hour', 'Day', 'Week', 'Month', 'Year', 'None'];
   public dpDiscontinuousList: any[] = [
@@ -89,9 +94,7 @@ export class TimeFilterPanelComponent extends AbstractFilterPanelComponent imple
     { name: 'Month by year', unit: 'MONTH', byUnit: 'YEAR' },
     { name: 'Year', unit: 'YEAR' }
   ];
-
-  @Input('filter')
-  public originalFilter: TimeFilter;
+  public getDimensionTypeIconClass = Field.getDimensionTypeIconClass;
 
   /*-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=
    | Constructor
@@ -113,26 +116,6 @@ export class TimeFilterPanelComponent extends AbstractFilterPanelComponent imple
    */
   public ngOnInit() {
     super.ngOnInit();
-    console.info( '>>>> time-filter-panel init' );
-  }
-
-  /**
-   * 화면 초기화
-   */
-  public ngAfterViewInit() {
-    super.ngAfterViewInit();
-    // 컴포넌트 초기화
-    this._initialize(this.originalFilter);
-
-    if( this.originalFilter['isNew'] ) {
-      this.isNewFilter = true;
-      this.safelyDetectChanges();
-      delete this.originalFilter['isNew'];
-      setTimeout( () => {
-        this.isNewFilter = false;
-        this.safelyDetectChanges();
-      }, 1500 );
-    }
 
     // 위젯에서 필터를 업데이트 popup은 아니지만 동일한 기능이 필요해서 popupService를 사용
     const popupSubscribe = this.popupService.filterView$.subscribe((data: SubscribeArg) => {
@@ -146,7 +129,15 @@ export class TimeFilterPanelComponent extends AbstractFilterPanelComponent imple
       }
     });
     this.subscriptions.push(popupSubscribe);
+  }
 
+  /**
+   * 화면 초기화
+   */
+  public ngAfterViewInit() {
+    super.ngAfterViewInit();
+    // 컴포넌트 초기화
+    this._initialize(this.originalFilter);
   } // function - ngAfterViewInit
 
   /**
@@ -159,14 +150,13 @@ export class TimeFilterPanelComponent extends AbstractFilterPanelComponent imple
   /*-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=
    | Public Method
    |-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=*/
-  public getDimensionTypeIconClass = Field.getDimensionTypeIconClass;
 
   /**
    * 필터 변경 이벤트 핸들러
    * @param {TimeFilter} filter
    */
   public changeFilterEvent(filter: TimeFilter) {
-    if (isNullOrUndefined(filter) || !FilterUtil.isTimeFilter(filter)) {
+    if (this.isNullOrUndefined(filter) || !FilterUtil.isTimeFilter(filter)) {
       return;
     }
     // this.filter = _.cloneDeep(filter);
@@ -181,14 +171,16 @@ export class TimeFilterPanelComponent extends AbstractFilterPanelComponent imple
     const filter: TimeFilter = _.cloneDeep(this.originalFilter);
     switch (filter.type) {
       case 'time_list' :
-        this._candidateComp.setData(<TimeListFilter>filter);
+        this._candidateComp.setData(filter as TimeListFilter);
         break;
       case 'time_relative' :
-        this._relativeComp.setData(<TimeRelativeFilter>filter);
+        this._relativeComp.setData(filter as TimeRelativeFilter);
         break;
       case 'time_range' :
-        this._rangeComp.setData(<TimeRangeFilter>filter);
+        this._rangeComp.setData(filter as TimeRangeFilter);
         break;
+      case 'time_single':
+        this._dateComp.setData(filter as TimeDateFilter);
     }
     this.filter = filter;
     this.safelyDetectChanges();
@@ -217,9 +209,12 @@ export class TimeFilterPanelComponent extends AbstractFilterPanelComponent imple
    * TimeRangeFilter 설정
    */
   public setTimeRangeFilter() {
+    console.log('setTimeRangeFilter');
     if( this.isDashboardMode ) {
+      console.log('isDashboardMode');
       let cloneFilter = JSON.parse(JSON.stringify(this.filter));
       if( this._tempRangeFilter) {
+        console.log('_tempRangeFilter');
         cloneFilter = this._tempRangeFilter;
       } else {
         cloneFilter = FilterUtil.getTimeRangeFilter( cloneFilter.clzField, cloneFilter.timeUnit, cloneFilter.ui.importanceType, this.dataSource );
@@ -228,10 +223,12 @@ export class TimeFilterPanelComponent extends AbstractFilterPanelComponent imple
     }
     else {
       if( this._tempRangeFilter) {
+        console.log('_tempRangeFilter2');
         this.filter = this._tempRangeFilter;
       } else {
         this.filter = FilterUtil.getTimeRangeFilter( this.filter.clzField, this.filter.timeUnit, this.filter.ui.importanceType );
       }
+      console.log('end of else ');
       ( this.originalFilter.ui.widgetId ) && ( this.filter.ui.widgetId = this.originalFilter.ui.widgetId );
       this.originalFilter = _.cloneDeep( this.filter );
       this._setStatus();
@@ -282,6 +279,30 @@ export class TimeFilterPanelComponent extends AbstractFilterPanelComponent imple
     this.originalFilter = _.cloneDeep( this.filter );
     this._setStatus();
   } // function - setTimeListFilter
+
+  /**
+   * TimeSingleFilter 설정
+   */
+  public setTimeSingleFilter() {
+    if (this.isDashboardMode) {
+      let cloneFilter = JSON.parse(JSON.stringify(this.filter));
+      if (this._tempSingleFilter) {
+        cloneFilter = this._tempSingleFilter;
+      } else {
+        cloneFilter = FilterUtil.getTimeDateFilter(cloneFilter.clzField, cloneFilter.timeUnit, cloneFilter.ui.importanceType);
+      }
+      this._updateFilter(cloneFilter);
+    } else {
+      if (this._tempSingleFilter){
+        this.filter = this._tempSingleFilter;
+      } else {
+        this.filter = FilterUtil.getTimeDateFilter(this.filter.clzField, this.filter.timeUnit, this.filter.ui.importanceType);
+      }
+      (this.originalFilter.ui.widgetId) && (this.filter.ui.widgetId = this.originalFilter.ui.widgetId);
+      this.originalFilter = _.cloneDeep(this.filter);
+      this._setStatus();
+    }
+  }
 
   /**
    * 필터 삭제
@@ -382,13 +403,13 @@ export class TimeFilterPanelComponent extends AbstractFilterPanelComponent imple
     }
   }
 
-  public get isAlphnumericDesc() {
-    if( this.isListType ) {
-      return this.filter['sortTarget'] === 'ALPHNUMERIC' && this.filter['sortType'] === 'DESC';
-    } else {
-      return false;
-    }
-  }
+  // public get isAlphnumericDesc() {
+  //   if( this.isListType ) {
+  //     return this.filter['sortTarget'] === 'ALPHNUMERIC' && this.filter['sortType'] === 'DESC';
+  //   } else {
+  //     return false;
+  //   }
+  // }
 
   public sortList( target: string, type: string ) {
     if( this._listComp ) {
@@ -413,13 +434,16 @@ export class TimeFilterPanelComponent extends AbstractFilterPanelComponent imple
     if( !filter.discontinuous ) {
       switch( filter.type ) {
         case 'time_relative' :
-          this._tempRelativeFilter = _.cloneDeep(<TimeRelativeFilter>filter);
+          this._tempRelativeFilter = _.cloneDeep(filter as TimeRelativeFilter);
           break;
         case 'time_range' :
-          this._tempRangeFilter = _.cloneDeep(<TimeRangeFilter>filter);
+          this._tempRangeFilter = _.cloneDeep(filter as TimeRangeFilter);
           break;
         case 'time_list' :
-          this._tempListFilter = _.cloneDeep(<TimeListFilter>filter);
+          this._tempListFilter = _.cloneDeep(filter as TimeListFilter);
+          break;
+        case 'time_single' :
+          this._tempSingleFilter = _.cloneDeep(filter as TimeDateFilter);
           break;
       }
     }
@@ -442,6 +466,7 @@ export class TimeFilterPanelComponent extends AbstractFilterPanelComponent imple
     this._tempRelativeFilter = null;
     this._tempRangeFilter = null;
     this._tempListFilter = null;
+    this._tempSingleFilter = null;
 
     this.filter = filter;
     this.originalFilter = _.cloneDeep(filter);
@@ -449,7 +474,6 @@ export class TimeFilterPanelComponent extends AbstractFilterPanelComponent imple
     this.setPanelData(filter);    // 패널에서 사용하는 데이터 설정
 
     if( this.dataSource )  {
-
       // 타임스탬프인지 판단
       if (this.field && this.field.type === 'TIMESTAMP' && this.field.role === FieldRole.TIMESTAMP) {
         this.isTimeStamp = true;
@@ -481,6 +505,7 @@ export class TimeFilterPanelComponent extends AbstractFilterPanelComponent imple
     this.isRelativeType = FilterUtil.isTimeRelativeFilter(this.filter);
     this.isRangeType = FilterUtil.isTimeRangeFilter(this.filter);
     this.isListType = FilterUtil.isTimeListFilter(this.filter);
+    this.isSingleType = FilterUtil.isTimeSingleFilter(this.filter);
     this.safelyDetectChanges();
   } // function - _setStatus
 }

@@ -20,6 +20,8 @@ export class FilterWidget extends Widget {
 
   public configuration:FilterWidgetConfiguration;
 
+  public parent?: FilterWidget; // for UI
+
   constructor(filter: Filter, dashboard:Dashboard) {
     super();
     // this.id = filter.type + '_' + filter.field;
@@ -30,7 +32,7 @@ export class FilterWidget extends Widget {
   }
 
   public getConfiguration(): FilterWidgetConfiguration {
-    return <FilterWidgetConfiguration>this.configuration;
+    return this.configuration as FilterWidgetConfiguration;
   }
 
 } // Class - FilterWidget

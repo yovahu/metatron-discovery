@@ -14,36 +14,36 @@
 
 import * as _ from 'lodash';
 import {Component, ElementRef, EventEmitter, Injector, OnDestroy, OnInit, Output, ViewChild} from '@angular/core';
+
+import {Alert} from '@common/util/alert.util';
+import {StringUtil} from '@common/util/string.util';
+import {SelectComponent} from '@common/component/select/select.component';
+
+import {
+  InequalityType,
+  MeasureInequalityFilter
+} from '@domain/workbook/configurations/filter/measure-inequality-filter';
+import {MeasurePositionFilter, PositionType} from '@domain/workbook/configurations/filter/measure-position-filter';
 import {
   Candidate,
   InclusionFilter,
   InclusionSelectorType,
   InclusionSortBy
-} from '../../../domain/workbook/configurations/filter/inclusion-filter';
-import {Field, FieldRole} from '../../../domain/datasource/datasource';
-import {CustomField} from '../../../domain/workbook/configurations/field/custom-field';
-import {Alert} from '../../../common/util/alert.util';
-import {
-  InequalityType,
-  MeasureInequalityFilter
-} from '../../../domain/workbook/configurations/filter/measure-inequality-filter';
-import {
-  MeasurePositionFilter,
-  PositionType
-} from '../../../domain/workbook/configurations/filter/measure-position-filter';
-import {ContainsType, WildCardFilter} from '../../../domain/workbook/configurations/filter/wild-card-filter';
-import {AggregationType} from '../../../domain/workbook/configurations/field/measure-field';
-import {AdvancedFilter} from '../../../domain/workbook/configurations/filter/advanced-filter';
-import {Dashboard} from '../../../domain/dashboard/dashboard';
+} from '@domain/workbook/configurations/filter/inclusion-filter';
+import {Field, FieldRole} from '@domain/datasource/datasource';
+import {CustomField} from '@domain/workbook/configurations/field/custom-field';
+import {ContainsType, WildCardFilter} from '@domain/workbook/configurations/filter/wild-card-filter';
+import {AggregationType} from '@domain/workbook/configurations/field/measure-field';
+import {AdvancedFilter} from '@domain/workbook/configurations/filter/advanced-filter';
+import {Dashboard} from '@domain/dashboard/dashboard';
+import {DIRECTION} from '@domain/workbook/configurations/sort';
+import {RegExprFilter} from '@domain/workbook/configurations/filter/reg-expr-filter';
+
 import {FilterUtil} from '../../util/filter.util';
+import {DashboardUtil} from '../../util/dashboard.util';
 import {DatasourceService} from '../../../datasource/service/datasource.service';
 import {AbstractFilterPopupComponent} from '../abstract-filter-popup.component';
-import {StringUtil} from '../../../common/util/string.util';
-import {SelectComponent} from '../../../common/component/select/select.component';
-import {DashboardUtil} from '../../util/dashboard.util';
-import {DIRECTION} from '../../../domain/workbook/configurations/sort';
-import {RegExprFilter} from "../../../domain/workbook/configurations/filter/reg-expr-filter";
-import {isNullOrUndefined} from "util";
+import {CommonUtil} from '@common/util/common.util';
 
 @Component({
   selector: 'app-config-filter-inclusion',
@@ -132,17 +132,23 @@ export class ConfigureFiltersInclusionComponent extends AbstractFilterPopupCompo
   public condition: MeasureInequalityFilter;
   public limitation: MeasurePositionFilter;
   public wildcard: WildCardFilter;
-  public regExpr : RegExprFilter;
+  public regExpr: RegExprFilter;
   public measureFields: Field[] = [];
 
   public useDefineValue: boolean = true;
   public usePaging: boolean = true;
 
   public matcherTypeList: any[];
-  private selectedMatcherType: any;
+  public selectedMatcherType: any;
+
+  public sortBy = InclusionSortBy;
+  public sortDirection = DIRECTION;
 
   @Output()
   public goToSelectField: EventEmitter<any> = new EventEmitter();
+
+  public itemShowCnt: number = FilterUtil.CANDIDATE_LIMIT;
+  public commonUtil = CommonUtil;
 
   /*-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=
   | Constructor
@@ -164,8 +170,11 @@ export class ConfigureFiltersInclusionComponent extends AbstractFilterPopupCompo
     super.ngOnInit();
 
     this.matcherTypeList = [
-      { label : this.translateService.instant('msg.board.th.filter.wildcard'), value : MatcherType.WILDCARD },
-      { label : this.translateService.instant('msg.board.th.filter.regular-expression'), value : MatcherType.REGULAR_EXPRESSION }
+      {label: this.translateService.instant('msg.board.th.filter.wildcard'), value: MatcherType.WILDCARD},
+      {
+        label: this.translateService.instant('msg.board.th.filter.regular-expression'),
+        value: MatcherType.REGULAR_EXPRESSION
+      }
     ];
 
     this.selectedMatcherType = this.matcherTypeList[0];
@@ -218,13 +227,13 @@ export class ConfigureFiltersInclusionComponent extends AbstractFilterPopupCompo
     });
 
     const defaultData: InclusionFilter
-      = FilterUtil.getBasicInclusionFilter(<Field>targetField, targetFilter.ui.importanceType, preFilterData);
+      = FilterUtil.getBasicInclusionFilter(targetField as Field, targetFilter.ui.importanceType, preFilterData);
 
     if (targetFilter.preFilters) {
       // lodash merge가 deepMerge 가 잘 되지 않아서 별도로 하위 데이터를 직접 합쳐줌
       targetFilter.preFilters = targetFilter.preFilters.map((data: AdvancedFilter) => {
         const defaultPreFilter: AdvancedFilter
-          = defaultData.preFilters.find((defaultPreFilter: AdvancedFilter) => data.type === defaultPreFilter.type);
+          = defaultData.preFilters.find((preFilter: AdvancedFilter) => data.type === preFilter.type);
         return _.merge(defaultPreFilter, data);
       });
     } else {
@@ -234,23 +243,23 @@ export class ConfigureFiltersInclusionComponent extends AbstractFilterPopupCompo
 
     targetFilter.preFilters.forEach((preFilter: AdvancedFilter) => {
       if (preFilter.type === 'measure_inequality') {
-        this._condition = <MeasureInequalityFilter>preFilter;
+        this._condition = preFilter as MeasureInequalityFilter;
         this.condition = _.cloneDeep(this._condition);
       } else if (preFilter.type === 'measure_position') {
-        this._limitation = <MeasurePositionFilter>preFilter;
+        this._limitation = preFilter as MeasurePositionFilter;
         this.limitation = _.cloneDeep(this._limitation);
       } else if (preFilter.type === 'wildcard') {
-        this._wildcard = <WildCardFilter>preFilter;
-        this.wildcard = _.cloneDeep( this._wildcard );
+        this._wildcard = preFilter as WildCardFilter;
+        this.wildcard = _.cloneDeep(this._wildcard);
       } else if (preFilter.type === 'regexpr') {
-        this._regExpr = <RegExprFilter>preFilter;
-        this.regExpr = _.cloneDeep( this._regExpr );
+        this._regExpr = preFilter as RegExprFilter;
+        this.regExpr = _.cloneDeep(this._regExpr);
       }
     });
 
-    if(StringUtil.isNotEmpty(this.wildcard.value)) {
+    if (StringUtil.isNotEmpty(this.wildcard.value)) {
       this.selectedMatcherType = this.matcherTypeList[0];
-    } else if(StringUtil.isNotEmpty(this.regExpr.expr)) {
+    } else if (StringUtil.isNotEmpty(this.regExpr.expr)) {
       this.selectedMatcherType = this.matcherTypeList[1];
     }
 
@@ -266,8 +275,10 @@ export class ConfigureFiltersInclusionComponent extends AbstractFilterPopupCompo
       this._candidateList = targetFilter.definedValues.map(item => this._stringToCandidate(item, true));
     }
 
+    this.itemShowCnt = targetFilter.limit ? targetFilter.limit : FilterUtil.CANDIDATE_LIMIT;
+
     this.loadingShow();
-    this.datasourceService.getCandidateForFilter(targetFilter, board, [], targetField, 'COUNT', this.searchText)
+    this.datasourceService.getCandidateForFilter(targetFilter, board, [], targetField, 'COUNT', this.searchText, this.itemShowCnt)
       .then(result => {
         this.targetFilter = targetFilter;
         this._targetField = targetField;
@@ -283,6 +294,7 @@ export class ConfigureFiltersInclusionComponent extends AbstractFilterPopupCompo
           this.selectedValues.push(this._candidateList[0]);
         }
 
+        // this.itemShowCnt = this.candidateListSize > 100 ? 100 : this.candidateListSize;
         this.isShow = true;
         this.safelyDetectChanges();
         this.loadingHide();
@@ -297,6 +309,7 @@ export class ConfigureFiltersInclusionComponent extends AbstractFilterPopupCompo
    */
   public getData(): InclusionFilter {
     const filter: InclusionFilter = this.targetFilter;
+    filter.limit = this.itemShowCnt;
     filter.valueList = this.selectedValues.map(item => item.name);
     filter.candidateValues = this._candidateValues.map(item => item.name);
     filter.definedValues = this._candidateList.filter(item => item.isDefinedValue).map(item => item.name);
@@ -346,7 +359,7 @@ export class ConfigureFiltersInclusionComponent extends AbstractFilterPopupCompo
    * 검색 입력을 비활성 처리 합니다.
    */
   public inactiveSearchInput() {
-    let inputElm = this._inputSearch.nativeElement;
+    const inputElm = this._inputSearch.nativeElement;
     ('' === inputElm.value.trim()) && (this.targetFilter['isShowSearch'] = false);
     inputElm.blur();
   } // function - inactiveSearchInput
@@ -357,7 +370,7 @@ export class ConfigureFiltersInclusionComponent extends AbstractFilterPopupCompo
   public candidateFromSearchText() {
     this.loadingShow();
     const sortBy: string = (this.targetFilter.sort && this.targetFilter.sort.by) ? this.targetFilter.sort.by.toString() : 'COUNT';
-    this.datasourceService.getCandidateForFilter(this.targetFilter, this._board, [], this._targetField, sortBy, this.searchText)
+    this.datasourceService.getCandidateForFilter(this.targetFilter, this._board,[], this._targetField, sortBy, this.searchText,  this.itemShowCnt)
       .then(result => {
         this._setCandidateResult(result, this.targetFilter, this._targetField);
         this.safelyDetectChanges();
@@ -443,7 +456,7 @@ export class ConfigureFiltersInclusionComponent extends AbstractFilterPopupCompo
    */
   public resetWildcard(filter: WildCardFilter) {
     filter.value = '';
-    if(this.isWildCardMatcher()) {
+    if (this.isWildCardMatcher()) {
       this._wildCardContainsCombo.selected(this.wildCardTypeList[0]);
     }
     this.safelyDetectChanges();
@@ -503,18 +516,18 @@ export class ConfigureFiltersInclusionComponent extends AbstractFilterPopupCompo
       return;
     }
 
-    if(this.isWildCardMatcher()) {
+    if (this.isWildCardMatcher()) {
       this.resetRegExpr(this.regExpr);
     } else {
       this.resetWildcard(this.wildcard);
     }
 
-    this._wildcard = _.cloneDeep( this.wildcard );
-    this._regExpr = _.cloneDeep( this.regExpr );
-    this._condition = _.cloneDeep( this.condition );
-    this._limitation = _.cloneDeep( this.limitation );
+    this._wildcard = _.cloneDeep(this.wildcard);
+    this._regExpr = _.cloneDeep(this.regExpr);
+    this._condition = _.cloneDeep(this.condition);
+    this._limitation = _.cloneDeep(this.limitation);
     this.targetFilter.preFilters = [this._wildcard, this._regExpr, this._condition, this._limitation];
-    this.datasourceService.getCandidateForFilter(this.targetFilter, this._board, [], this._targetField).then(result => {
+    this.datasourceService.getCandidateForFilter(this.targetFilter, this._board,[], this._targetField, null, null, this.itemShowCnt).then(result => {
       this._candidateList = this._candidateList.filter(item => item.isDefinedValue);  // initialize list
       this._setCandidateResult(result, this.targetFilter, this._targetField);
       this.safelyDetectChanges();
@@ -528,19 +541,19 @@ export class ConfigureFiltersInclusionComponent extends AbstractFilterPopupCompo
    */
   public toggleConfigFilteringLayer(filter: InclusionFilter) {
     if (!filter['isShowCandidateFilter']) {
-      this.wildcard = _.cloneDeep( this._wildcard );
-      this.condition = _.cloneDeep( this._condition );
-      this.limitation = _.cloneDeep( this._limitation );
+      this.wildcard = _.cloneDeep(this._wildcard);
+      this.condition = _.cloneDeep(this._condition);
+      this.limitation = _.cloneDeep(this._limitation);
 
-      if(this.isWildCardMatcher()) {
-        this._wildCardContainsCombo.selected( this.wildCardTypeList.find(item => ContainsType[item.value] === this.wildcard.contains) );
+      if (this.isWildCardMatcher()) {
+        this._wildCardContainsCombo.selected(this.wildCardTypeList.find(item => ContainsType[item.value] === this.wildcard.contains));
       }
-      this._condFieldCombo.selected( this.measureFields.find(item => item.name === this.condition.field) );
-      this._condAggrCombo.selected( this.aggregationTypeList.find(item => AggregationType[item.value] === this.condition.aggregation) );
-      this._condInequalityCombo.selected( this.conditionTypeList.find(item => InequalityType[item.value] === this.condition.inequality) );
-      this._limitFieldCombo.selected( this.measureFields.find(item => item.name === this.limitation.field) );
-      this._limitAggrCombo.selected( this.aggregationTypeList.find(item => AggregationType[item.value] === this.limitation.aggregation) );
-      this._limitPositionCombo.selected( this.limitTypeList.find(item => PositionType[item.value] === this.limitation.position) );
+      this._condFieldCombo.selected(this.measureFields.find(item => item.name === this.condition.field));
+      this._condAggrCombo.selected(this.aggregationTypeList.find(item => AggregationType[item.value] === this.condition.aggregation));
+      this._condInequalityCombo.selected(this.conditionTypeList.find(item => InequalityType[item.value] === this.condition.inequality));
+      this._limitFieldCombo.selected(this.measureFields.find(item => item.name === this.limitation.field));
+      this._limitAggrCombo.selected(this.aggregationTypeList.find(item => AggregationType[item.value] === this.limitation.aggregation));
+      this._limitPositionCombo.selected(this.limitTypeList.find(item => PositionType[item.value] === this.limitation.position));
     }
     filter['isShowCandidateFilter'] = !filter['isShowCandidateFilter'];
   } // function - toggleConfigFilteringLayer
@@ -548,8 +561,6 @@ export class ConfigureFiltersInclusionComponent extends AbstractFilterPopupCompo
   /*-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=
   | Public Method - 목록 정렬 관련
   |-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=*/
-  public sortBy = InclusionSortBy;
-  public sortDirection = DIRECTION;
 
   /**
    * 후보값을 정렬한다.
@@ -599,7 +610,6 @@ export class ConfigureFiltersInclusionComponent extends AbstractFilterPopupCompo
    * @param {boolean} isInitial
    */
   public setCandidatePage(page: number, isInitial: boolean = false) {
-
     if (isInitial) {
       this.pageCandidateList = [];
       this.currentPage = 1;
@@ -608,7 +618,6 @@ export class ConfigureFiltersInclusionComponent extends AbstractFilterPopupCompo
       this.safelyDetectChanges();
     }
     if (this._candidateList && 0 < this._candidateList.length) {
-
       let pagedList: Candidate[] = _.cloneDeep(this._candidateList);
 
       if (this.targetFilter && this.targetFilter.showSelectedItem) {
@@ -620,7 +629,7 @@ export class ConfigureFiltersInclusionComponent extends AbstractFilterPopupCompo
       // 검색 적용
       if ('' !== this.searchText) {
         pagedList = pagedList.filter(item => {
-          return ( item.name ) ? -1 < item.name.toLowerCase().indexOf(this.searchText.toLowerCase()) : false;
+          return (item.name) ? -1 < item.name.toLowerCase().indexOf(this.searchText.toLowerCase()) : false;
         });
       }
 
@@ -642,7 +651,7 @@ export class ConfigureFiltersInclusionComponent extends AbstractFilterPopupCompo
         // 마지막 페이지 계산
         this.lastPage = (this.totalCount % this.pageSize === 0) ? (this.totalCount / this.pageSize) : Math.floor(this.totalCount / this.pageSize) + 1;
 
-        let start = (page * this.pageSize) - this.pageSize;
+        const start = (page * this.pageSize) - this.pageSize;
         let end = page * this.pageSize;
         if (end > this.totalCount) {
           end = this.totalCount;
@@ -654,7 +663,6 @@ export class ConfigureFiltersInclusionComponent extends AbstractFilterPopupCompo
         this.pageCandidateList = pagedList;
       }
     }
-
   } // function - setCandidatePage
 
   /*-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=
@@ -662,7 +670,6 @@ export class ConfigureFiltersInclusionComponent extends AbstractFilterPopupCompo
   |-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=*/
   /**
    * 전체 선택
-   * @param event
    */
   public candidateSelectAll() {
     if (this.isSingleSelect(this.targetFilter)) {
@@ -806,15 +813,33 @@ export class ConfigureFiltersInclusionComponent extends AbstractFilterPopupCompo
   }
 
   public isWildCardMatcher(): boolean {
-    return this.selectedMatcherType.value == MatcherType.WILDCARD;
+    return this.selectedMatcherType.value === MatcherType.WILDCARD;
   }
 
   public isRegularExpressionMatcher(): boolean {
-    return this.selectedMatcherType.value == MatcherType.REGULAR_EXPRESSION;
+    return this.selectedMatcherType.value === MatcherType.REGULAR_EXPRESSION;
   }
 
   public isNoFiltering() {
-    return this.selectedValues.length == 0;
+    return this.selectedValues.length === 0;
+  }
+
+  /**
+   * 아이템 목록 조회 개수 변경
+   */
+  public changeShowNum(event: KeyboardEvent){
+    if(13 === event.keyCode) {
+      this.searchText = '';
+      this.itemShowCnt = event.target['value'];
+      this.datasourceService.getCandidateForFilter(this.targetFilter, this._board,[], this._targetField, null, null, this.itemShowCnt).then(result => {
+        this._candidateList = this._candidateList.filter(item => item.isDefinedValue);
+        this._candidateValues = this._candidateList;
+        this.targetFilter.candidateValues = [];
+        this._setCandidateResult(result, this.targetFilter, this._targetField);
+        this.safelyDetectChanges();
+        this.loadingHide();
+      });
+    }
   }
 
   /*-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=
@@ -895,7 +920,6 @@ export class ConfigureFiltersInclusionComponent extends AbstractFilterPopupCompo
             .map(item => this._stringToCandidate(item, true))
         );
     }
-
     // 목록 설정
     this._candidateList =
       this._candidateList.concat(
@@ -904,7 +928,7 @@ export class ConfigureFiltersInclusionComponent extends AbstractFilterPopupCompo
           .filter(item => -1 === this._candidateList.findIndex(can => can.name === item.name))
       );
 
-    if(targetFilter.candidateValues && 0 < targetFilter.candidateValues.length) {
+    if (targetFilter.candidateValues && 0 < targetFilter.candidateValues.length) {
       this._candidateList =
         this._candidateList.concat(
           targetFilter.candidateValues
@@ -916,8 +940,8 @@ export class ConfigureFiltersInclusionComponent extends AbstractFilterPopupCompo
     // 목록에 선택값이 없을 경우 선택값 추가
     if (this.selectedValues && 0 < this.selectedValues.length) {
       this.selectedValues.forEach((selectedItem) => {
-        const item = this._candidateList.find(item => item.name === selectedItem.name);
-        if (isNullOrUndefined(item)) {
+        const item = this._candidateList.find(candidateItem => candidateItem.name === selectedItem.name);
+        if (this.isNullOrUndefined(item)) {
           this._candidateList.push(selectedItem);
         }
       });
@@ -982,6 +1006,6 @@ export class ConfigureFiltersInclusionComponent extends AbstractFilterPopupCompo
 }
 
 enum MatcherType {
-  WILDCARD = <any>'WILDCARD',
-  REGULAR_EXPRESSION = <any>'REGULAR_EXPRESSION'
+  WILDCARD = 'WILDCARD',
+  REGULAR_EXPRESSION = 'REGULAR_EXPRESSION'
 }

@@ -3,7 +3,7 @@ import {TranslateService} from '@ngx-translate/core';
 import * as _ from 'lodash';
 import {Type} from '../domain/type';
 import {Filter} from '../domain/filter';
-import {DataStorageConstant} from "../../../data-storage/constant/data-storage-constant";
+import {DataStorageConstant} from '../../../data-storage/constant/data-storage-constant';
 
 /**
  * Service to be shared by the datasource and metadata
@@ -25,6 +25,7 @@ export class ConstantService {
     new Filter.Logical(this.translateService.instant('msg.storage.ui.list.double'), Type.Logical.DOUBLE, 'ddp-icon-type-float'),
     new Filter.Logical(this.translateService.instant('msg.storage.ui.list.date'), Type.Logical.TIMESTAMP, 'ddp-icon-type-calen'),
     new Filter.Logical(this.translateService.instant('msg.storage.ui.list.array'), Type.Logical.ARRAY, 'ddp-icon-type-array'),
+    new Filter.Logical(this.translateService.instant('msg.storage.ui.list.hashed.map'), Type.Logical.HASHED_MAP, 'ddp-icon-type-etc'),
     new Filter.Logical(this.translateService.instant('msg.storage.ui.list.lnt'), Type.Logical.LNT, 'ddp-icon-type-latitude'),
     new Filter.Logical(this.translateService.instant('msg.storage.ui.list.lng'), Type.Logical.LNG, 'ddp-icon-type-longitude'),
     new Filter.Logical(this.translateService.instant('msg.storage.ui.list.geo.point'), Type.Logical.GEO_POINT, 'ddp-icon-type-point'),
@@ -103,22 +104,27 @@ export class ConstantService {
         return type.value !== Type.Logical.ALL
           && type.value !== Type.Logical.GEO_POINT
           && type.value !== Type.Logical.GEO_POLYGON
-          && type.value !== Type.Logical.GEO_LINE;
+          && type.value !== Type.Logical.GEO_LINE
+          && type.value !== Type.Logical.HASHED_MAP;
       }));
   }
 
   public getTypeFiltersInDimensionIncludeGeoTypes() {
-    return _.cloneDeep(this.typeFilters.filter(type => type.value !== Type.Logical.ALL));
+    return _.cloneDeep(this.typeFilters.filter(type => type.value !== Type.Logical.ALL
+      && type.value !== Type.Logical.HASHED_MAP));
   }
 
   public getTypeFiltersInDimensionOnlyBaseTypeString() {
-    return _.cloneDeep(this.typeFilters.filter(type => type.value !== Type.Logical.ALL));
+    return _.cloneDeep(this.typeFilters.filter(type => type.value !== Type.Logical.ALL
+      && type.value !== Type.Logical.HASHED_MAP));
   }
 
   public getTypeFiltersInMeasure() {
     return _.cloneDeep(
       this.typeFilters.filter(type => {
-        return type.value !== Type.Logical.ALL && (type.value === Type.Logical.INTEGER || type.value === Type.Logical.DOUBLE || type.value === Type.Logical.ARRAY);
+        return type.value !== Type.Logical.ALL &&
+          (type.value === Type.Logical.INTEGER || type.value === Type.Logical.DOUBLE
+            || type.value === Type.Logical.ARRAY || type.value === Type.Logical.HASHED_MAP);
       }));
   }
 

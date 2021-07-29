@@ -22,15 +22,26 @@
      class="ddp-box-widget ddp-box-graph" style="display:block;">
 
   <!-- Top Control -->
-  <div class="ddp-top-control ddp-clear" *ngIf="isViewMode && ( !errorInfo || !errorInfo.show ) && !isShowEvtTriggerEditor">
+  <div class="ddp-top-control ddp-clear"
+       *ngIf="isViewMode && ( !errorInfo || !errorInfo.show ) && !isShowEvtTriggerEditor" [style.float]="toolTipLoc ? 'left' : 'right' ">
 
     <!-- 버튼 목록 -->
     <div class="ddp-ui-buttons" >
 
+      <div *ngIf="chartType === 'grid'"class="ddp-box-btn2">
+        <em (click)="toolTipLoc = !toolTipLoc" class="ddp-icon-widget-move"></em>
+        <!-- 툴팁 -->
+        <div class="ddp-ui-tooltip-info" style="left: 10px;width: 30px;">
+          <em class="ddp-icon-view-down"></em>
+          Move
+        </div>
+        <!-- //툴팁 -->
+      </div>
+
       <!-- Event Trigger -->
-      <div  *ngIf="isAuthMgmtViewMode" class="ddp-box-btn2">
+      <div *ngIf="isAuthMgmtViewMode" class="ddp-box-btn2">
         <em (click)="openUserFuncInput()" class="ddp-icon-widget-trigger "></em>
-        <div class="ddp-ui-tooltip-info">
+        <div class="ddp-ui-tooltip-info" style="left: 10px;width: 75px;">
           <em class="ddp-icon-view-down"></em>
           {{ 'msg.board.ui.custom-action' | translate }}
         </div>
@@ -130,19 +141,25 @@
                 </tr>
                 <tr *ngIf="existChartFilter()">
                   <th>{{'msg.page.ui.filter' | translate }}</th>
-                  <td>{{getChartFilterStr()}}</td>
+                  <td>{{getChartFilterStr()}} </td>
+                </tr>
+                <tr>
+                  <th>{{'msg.page.chart.info.id' | translate}}</th>
+                  <td>{{widget.id}}
+                    <em (click)="copyWidgetUrlToClipboard()" class="rs-component-btn-icon1 type-clipboard"
+                        style="display: inline-block; margin: 1px 0 0 3px;" ></em>
+                  </td>
                 </tr>
               </tbody>
             </table>
           </div>
-
         </div>
         <!-- //popup -->
       </div>
       <!-- // 차트 정보 영역 -->
 
       <!-- 데이터 저장 버튼 -->
-      <div *ngIf="isShowChartTools && isNotMapType" (click)="showPreviewDownData($event)" [class.ddp-box-download]="duringDataDown" class="ddp-box-btn2" >
+      <div *ngIf="isShowChartTools && isNotMapType" (click)="showPreviewDownData()" [class.ddp-box-download]="duringDataDown" class="ddp-box-btn2" >
         <em *ngIf="duringDataDown" class="ddp-icon-widget-loading"></em>
         <span *ngIf="duringDataDown" class="ddp-txt">{{ 'msg.comm.ui.downloading' | translate }}</span>
         <em *ngIf="!duringDataDown" class="ddp-icon-widget-gridsave" ></em>
@@ -398,7 +415,7 @@
                  (chartSelectInfo)="chartSelectInfo($event)"
                  (noData)="showNoData()"
                  (drawFinished)="updateComplete()"
-                 (changeDraw)="changeDraw($event)">
+                 (changeDraw)="changeDraw()">
     </map-chart>
 
   </div>
@@ -564,7 +581,7 @@
   </div>
   <!-- //미리보기 팝업 -->
 
-  <div *ngIf="isShowEvtTriggerEditor" #userFuncInputContainer
+  <div *ngIf="isShowEvtTriggerEditor"  #userFuncInputContainer
        style="position: absolute; top: 0; left: 0; right: 0; bottom: 0; z-index: 1;">
     <div class="ddp-top-control ddp-clear">
       <!-- buttons -->

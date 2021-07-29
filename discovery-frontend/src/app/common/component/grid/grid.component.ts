@@ -13,11 +13,11 @@
  */
 
 import * as _ from 'lodash';
-import { AfterViewInit, Component, ElementRef, EventEmitter, OnDestroy, Output } from '@angular/core';
-import { GridOption, Option } from './grid.option';
-import { header, SlickGridHeader } from './grid.header';
-import { saveAs } from 'file-saver';
-import { isNumeric } from 'rxjs/util/isNumeric';
+import {AfterViewInit, Component, ElementRef, EventEmitter, OnDestroy, Output} from '@angular/core';
+import {GridOption, Option} from './grid.option';
+import {Header, SlickGridHeader} from './grid.header';
+import {saveAs} from 'file-saver';
+import * as XLSX from 'xlsx';
 
 declare const jQuery_1_7;
 declare const Slick: any;
@@ -68,7 +68,7 @@ export class GridComponent implements AfterViewInit, OnDestroy {
   private isGridCreated: boolean;
   private isError: boolean;
   private GRID_DEFAULT_OPTION: Option;
-  private DATA_VIEW_DEFAULT_OPTION: Object = {
+  private DATA_VIEW_DEFAULT_OPTION: object = {
     groupItemMetadataProvider: null,
     inlineFilters: false
   };
@@ -76,7 +76,7 @@ export class GridComponent implements AfterViewInit, OnDestroy {
 
   private _selectColumnIds: string[] = []; // 선택된 컬럼의 아이디 목록 저장
 
-  private columnResized : boolean = false;
+  private columnResized: boolean = false;
   // -------------------------------------------------------------------------------------------------------------------
   // 이벤트
   // -------------------------------------------------------------------------------------------------------------------
@@ -85,10 +85,12 @@ export class GridComponent implements AfterViewInit, OnDestroy {
   @Output() private selectedEvent = new EventEmitter();
   // 정렬 변경시 알림
   @Output() private sortingEvent = new EventEmitter();
+
   // 헤더 선택시 알림
+  // @ts-ignore
   @Output() private selectedHeaderEvent = new EventEmitter();
 
-  @Output() private selectedHeaderMenuEvent = new EventEmitter();
+  // @Output() private selectedHeaderMenuEvent = new EventEmitter();
 
   @Output() private onColumnResize = new EventEmitter();
 
@@ -165,23 +167,21 @@ export class GridComponent implements AfterViewInit, OnDestroy {
 
     const rows: any[] = [];
 
-    const header: any[] = [];
-    this.fields
-      .forEach((headerName, index) => {
+    const header: string[] = this.fields
+      .map((headerName, _index) => {
         // if (index === 0 && this.option.dualSelectionActivate) {
         //   header.push(' ');
         // } else {
         //   header.push(headerName);
         // }
-        header.push('"' + headerName + '"');
+        return '"' + headerName + '"';
       });
-
     rows.push(header.join(','));
 
     this.getRows()
       .forEach((column) => {
         const obj: any[] = [];
-        this.fields.forEach((headerName, index) => {
+        this.fields.forEach((headerName, _index) => {
           // if (index === 0 && this.option.dualSelectionActivate) {
           //   obj.push(column['_idProperty_']);
           // } else {
@@ -201,36 +201,40 @@ export class GridComponent implements AfterViewInit, OnDestroy {
    */
   public excelDownload(fileName: string = ''): void {
 
-    const rows: any[] = [];
-
-    const header: any[] = [];
-    this.fields
-      .forEach((headerName, index) => {
+    const header: string[] = this.fields
+      .map((headerName, _index) => {
         // if (index === 0 && this.option.dualSelectionActivate) {
         //   header.push(' ');
         // } else {
         //   header.push(headerName);
         // }
-        header.push('"' + headerName + '"');
+        return headerName;
       });
 
-    rows.push(header.join(','));
-
+    const rows: any[] = [];
     this.getRows()
       .forEach((column) => {
-        const obj: any[] = [];
-        this.fields.forEach((headerName, index) => {
+        const obj: { [key: string]: string } = {};
+        this.fields.forEach((headerName, _index) => {
           // if (index === 0 && this.option.dualSelectionActivate) {
           //   obj.push(column['_idProperty_']);
           // } else {
           //   obj.push(column[headerName]);
           // }
-          obj.push('"' + column[headerName] + '"');
+          obj[headerName] = column[headerName];
         });
-        rows.push(obj.join(','));
+        rows.push(obj);
       });
 
-    this.downloadExcel(rows.join('\n'), _.isEmpty(fileName) ? this.createTimeStamp() : fileName);
+    const ws = XLSX.utils.json_to_sheet(rows, {header: header});
+    /* generate workbook and add the worksheet */
+    const wb: XLSX.WorkBook = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(wb, ws, 'Sheet1');
+
+    /* save to file */
+    XLSX.writeFile(wb, (_.isEmpty(fileName) ? this.createTimeStamp() : fileName) + '.xlsx');
+
+    // this.downloadExcel(rows.join('\n'), _.isEmpty(fileName) ? this.createTimeStamp() : fileName);
   } // function - excelDownload
 
   /**
@@ -290,7 +294,7 @@ export class GridComponent implements AfterViewInit, OnDestroy {
     // 그리드에 보여지고 있는 로우의 숫자
     const gridRowLength = fnScope.dataView.getLength();
     for (let index: number = 0; index < gridRowLength; index += 1) {
-      const row: Object = fnScope.dataView.getItem(index);
+      const row: object = fnScope.dataView.getItem(index);
       if (!('undefined' === typeof row)) {
         rRows.push(row);
       }
@@ -333,9 +337,9 @@ export class GridComponent implements AfterViewInit, OnDestroy {
   /**
    * 컬럼 선택
    * @param {number | string} column
-   * @param scope
+   * @param _scope
    */
-  public columnSelection(column: number | string, scope: any = null,): void {
+  public columnSelection(column: number | string, _scope: any = null,): void {
     this.selectColumn(column, true);
   } // function - columnSelection
 
@@ -359,17 +363,16 @@ export class GridComponent implements AfterViewInit, OnDestroy {
    * @param isAsc - ASC : true, DESC : false
    * @param scope
    */
-  public setCurrentSortColumns(isAsc : boolean, scope: any = null,): void {
+  public setCurrentSortColumns(isAsc: boolean, scope: any = null,): void {
 
     const fnScope: any = scope === null ? this : scope;
-    let arr = [];
+    const arr = [];
     const columnsList = fnScope.grid.getColumns();
-    for (let index: number = 0; index < columnsList.length; index++) {
-      let obj = {
-        columnId : columnsList[index]['id'],
-        sortAsc : isAsc
-      };
-      arr.push(obj);
+    for (let index: number = 0, nMax = columnsList.length; index < nMax; index++) {
+      arr.push({
+        columnId: columnsList[index]['id'],
+        sortAsc: isAsc
+      });
     }
     fnScope.grid.setSortColumns(arr, isAsc);
 
@@ -378,18 +381,18 @@ export class GridComponent implements AfterViewInit, OnDestroy {
   /**
    * 컬럼 선택 해제
    * @param {number | string} column
-   * @param scope
+   * @param _scope
    */
-  public columnUnSelection(column: number | string, scope: any = null,): void {
+  public columnUnSelection(column: number | string, _scope: any = null): void {
     this.selectColumn(column, false);
   } // function - columnUnSelection
 
   /**
    * 컬럼 선택 변경
    * @param {number | string} column
-   * @param scope
+   * @param _scope
    */
-  public columnSelectionToggle(column: number | string, scope: any = null,): void {
+  public columnSelectionToggle(column: number | string, _scope: any = null): void {
     this.selectColumn(column, 'TOGGLE');
   } // function - columnSelectionToggle
 
@@ -474,7 +477,7 @@ export class GridComponent implements AfterViewInit, OnDestroy {
    * @param {Option} option
    * @returns {boolean}
    */
-  public create(headers: header[], rows: any[], option: Option = null): boolean {
+  public create(headers: Header[], rows: any[], option: Option = null): boolean {
 
     try {
 
@@ -520,8 +523,8 @@ export class GridComponent implements AfterViewInit, OnDestroy {
           .Resizable(true)
           .Unselectable(true)
           .Sortable(this.option.enableSeqSort)
-          .Formatter((function (scope) {
-            return function (row, cell, value, columnDef, dataContext) {
+          .Formatter(((scope) => {
+            return (_row, _cell, value, columnDef, _dataContext) => {
               if (scope.option.enableHeaderClick && columnDef.id === '_idProperty_') {
                 return '<div style=\'line-height:30px;\'>' + '&middot;' + '</div>';
               } else {
@@ -555,7 +558,7 @@ export class GridComponent implements AfterViewInit, OnDestroy {
    * display no data
    * @returns {boolean}
    */
-  public noShowData(){
+  public noShowData() {
     this.destroy();
     return true;
   }
@@ -579,7 +582,7 @@ export class GridComponent implements AfterViewInit, OnDestroy {
       this.grid.setSelectedRows([]);
 
       // 검색 실행
-      this.executeFilter(searchText, GridComponent.isAllSearch(searchFields) ? this.fields : searchFields);
+      this.executeFilter(searchText, this.isAllSearch(searchFields) ? this.fields : searchFields);
 
       // dataView refresh
       this.dataView.refresh();
@@ -641,10 +644,9 @@ export class GridComponent implements AfterViewInit, OnDestroy {
       const gridRows: any[] = this.getGridRows();
       if (0 < gridRows.length) {
         // noinspection JSMismatchedCollectionQueryUpdate
-        const row: any[] = gridRows
-          .filter(row => String(row.id) === String(rowId));
+        const filteredRows: any[] = gridRows.filter(rowInfo => String(rowInfo.id) === String(rowId));
 
-        if (0 < row.length) {
+        if (0 < filteredRows.length) {
 
           //noinspection ExceptionCaughtLocallyJS
           throw new Error(`An already existing ID has been used. ID: ${rowId}`);
@@ -823,7 +825,7 @@ export class GridComponent implements AfterViewInit, OnDestroy {
    * @param isCtrlKeyPressed ctrlKey가 눌렸는지 여부
    * @param type 컬럼 타입
    */
-  public selectColumn(column: number | string, isSelectOrToggle: boolean | string, scope: any = null, isShiftKeyPressed?:boolean, isCtrlKeyPressed?:boolean, type?: string): void {
+  public selectColumn(column: number | string, isSelectOrToggle: boolean | string, scope: any = null, isShiftKeyPressed?: boolean, isCtrlKeyPressed?: boolean, type?: string): void {
 
     const fnScope: any = scope === null ? this : scope;
 
@@ -837,32 +839,32 @@ export class GridComponent implements AfterViewInit, OnDestroy {
       throw new Error('Invalid column information!!');
     }
 
-    let isSelect = false;
+    let isSelect: boolean;
     if ('string' === typeof isSelectOrToggle && 'TOGGLE' === isSelectOrToggle) {
-      isSelect = ( 0 === this._selectColumnIds.filter(item => item === columnId).length );
+      isSelect = (0 === this._selectColumnIds.filter(item => item === columnId).length);
     } else {
-      isSelect = <boolean>isSelectOrToggle;
+      isSelect = isSelectOrToggle as boolean;
     }
 
     // 선택 컬럼 목록 변경
     if (this.option.multiSelect === false) {
-      this._selectColumnIds = ( isSelect ) ? [columnId] : [];
+      this._selectColumnIds = (isSelect) ? [columnId] : [];
     } else {
       this._selectColumnIds = this._selectColumnIds.filter(item => item !== columnId);
-      ( isSelect ) && ( this._selectColumnIds.push(columnId) );
+      (isSelect) && (this._selectColumnIds.push(columnId));
     }
 
     // 이벤트 발생
-    fnScope.grid.getColumns().forEach( item => {
-      item['select'] = ( -1 < this._selectColumnIds.indexOf( item.id ) );
+    fnScope.grid.getColumns().forEach(item => {
+      item['select'] = (-1 < this._selectColumnIds.indexOf(item.id));
     });
 
-    let selectedColumnData = {
+    const selectedColumnData = {
       id: columnId,
       isSelect: isSelect,
       selectColumnIds: this._selectColumnIds,
-      shiftKey : isShiftKeyPressed,
-      ctrlKey : isCtrlKeyPressed
+      shiftKey: isShiftKeyPressed,
+      ctrlKey: isCtrlKeyPressed
     };
 
     if (type) { // 타입이 있을때만 같이 보냄
@@ -885,11 +887,11 @@ export class GridComponent implements AfterViewInit, OnDestroy {
    * 검색에 사용할 필드 목록를 생성한다
    * @param {header[]} headers
    */
-  private createSearchFields(headers: header[]): void {
+  private createSearchFields(headers: Header[]): void {
 
-    headers.forEach((header) => {
+    headers.forEach((headerInfo) => {
 
-      const fieldName: string = header['field'];
+      const fieldName: string = headerInfo['field'];
       if (!('undefined' === typeof fieldName)) {
         this.fields.push(fieldName);
       }
@@ -901,7 +903,7 @@ export class GridComponent implements AfterViewInit, OnDestroy {
    * @param {header[]} headers
    * @param {any[]} rows
    */
-  private createGrid(headers: header[], rows: any[]): void {
+  private createGrid(headers: Header[], rows: any[]): void {
 
     // 데이터 뷰 생성
     this.dataView = new Slick.Data.DataView(this.DATA_VIEW_DEFAULT_OPTION);
@@ -915,7 +917,7 @@ export class GridComponent implements AfterViewInit, OnDestroy {
     this.grid = new Slick.Grid(`#${this.GRID_TARGET_ID}`, this.dataView, headers, this.option);
 
     // 툴팁 플러그인 추가
-    const autoTooltips = new Slick.AutoTooltips({ enableForHeaderCells: true });
+    const autoTooltips = new Slick.AutoTooltips({enableForHeaderCells: true});
     this.grid.registerPlugin(autoTooltips);
 
     // 자동 컬럼 리사이징 플러그인 추가
@@ -940,7 +942,7 @@ export class GridComponent implements AfterViewInit, OnDestroy {
 
       // 그리드 로우 선택 기능 활성화
       this.grid.setSelectionModel(
-        new Slick.RowSelectionModel({ selectActiveRow: false })
+        new Slick.RowSelectionModel({selectActiveRow: false})
       );
     }
 
@@ -962,10 +964,16 @@ export class GridComponent implements AfterViewInit, OnDestroy {
     if (this.option.enableHeaderMenu) {
 
       // Header menu plugin
-      let headerButtonsPlugin = new Slick.Plugins.HeaderButtons();
-      headerButtonsPlugin.onCommand.subscribe((function (scope) {
-          return function (e, args) {
-            scope.onContextMenuClick.emit({columnName : args.button.command, index : args.button.index, left : e.pageX, top : e.pageY, columnType : args.button.type });
+      const headerButtonsPlugin = new Slick.Plugins.HeaderButtons();
+      headerButtonsPlugin.onCommand.subscribe(((scope) => {
+          return (e, args) => {
+            scope.onContextMenuClick.emit({
+              columnName: args.button.command,
+              index: args.button.index,
+              left: e.pageX,
+              top: e.pageY,
+              columnType: args.button.type
+            });
             scope.grid.invalidate();
           };
         })(this)
@@ -986,10 +994,10 @@ export class GridComponent implements AfterViewInit, OnDestroy {
     //    - select row 이벤트
     // -----------------------------------------------------------------------------------------------------------------
 
-    if( this.option.rowSelectionActivate ) {
+    if (this.option.rowSelectionActivate) {
       this.grid.onClick.subscribe(
-        (function (scope) {
-          return function (event, args) {
+        ((scope) => {
+          return (_event, args) => {
 
             const rowIndex: number = args.row;
 
@@ -1025,8 +1033,9 @@ export class GridComponent implements AfterViewInit, OnDestroy {
 
     this.grid.onSort
       .subscribe(
+        // tslint:disable-next-line:only-arrow-functions
         (function (scope) {
-          return function (event, args) {
+          return function (_event, args) {
             try {
 
               if (scope.isCellExternalCopyManagerActivate()) {
@@ -1066,20 +1075,20 @@ export class GridComponent implements AfterViewInit, OnDestroy {
 
               // 기본적으로 사용하는 정렬 함수
               const sort = () => scope.dataView.sort((row1, row2) => {
-                for (let index: number = 0; index < cols.length; index += 1) {
+                for (let index: number = 0, nMax = cols.length; index < nMax; index += 1) {
                   const field = cols[index].sortCol.field;
                   const sign = cols[index].sortAsc ? 1 : -1;
 
                   if (_.isNil(row1[field]) || row1[field] === '') {
-                    row1[field] = " ";
+                    row1[field] = ' ';
                   }
 
                   if (_.isNil(row2[field]) || row2[field] === '') {
-                    row2[field] = " ";
+                    row2[field] = ' ';
                   }
 
-                  const value1 = isNumeric(row1[field]) ? Number(row1[field]) : row1[field];
-                  const value2 = isNumeric(row2[field]) ? Number(row2[field]) : row2[field];
+                  const value1 = isNaN(row1[field]) ? row1[field] : Number(row1[field]);
+                  const value2 = isNaN(row2[field]) ? row2[field] : Number(row2[field]);
 
                   const result = (value1 === value2 ? 0 : (value1 > value2 ? 1 : -1)) * sign;
                   if (!(0 === result)) {
@@ -1095,7 +1104,7 @@ export class GridComponent implements AfterViewInit, OnDestroy {
                 // 아이디 헤더 선택시
                 if (scope.isHeaderFieldIdProperty(args)) {
                   scope.dataView.sort((row1, row2) => {
-                    for (let index: number = 0; index < cols.length; index += 1) {
+                    for (let index: number = 0, nMax = cols.length; index < nMax; index += 1) {
                       const field = cols[index].sortCol.field;
                       const sign = cols[index].sortAsc ? 1 : -1;
                       const value1 = Number(row1[field]);
@@ -1141,8 +1150,8 @@ export class GridComponent implements AfterViewInit, OnDestroy {
 
     if (!this.isCellExternalCopyManagerActivate() || this.option.dualSelectionActivate) {
       this.grid.onClick.subscribe(
-        (function (scope) {
-          return function (event, args) {
+        ((scope) => {
+          return (event, args) => {
 
             if (!scope.clickEnabled) {
               return;
@@ -1241,6 +1250,7 @@ export class GridComponent implements AfterViewInit, OnDestroy {
     // -----------------------------------------------------------------------------------------------------------------
 
     this.dataView.onRowCountChanged.subscribe(
+      // tslint:disable-next-line:only-arrow-functions
       (function (scope) {
         return function () {
 
@@ -1273,8 +1283,8 @@ export class GridComponent implements AfterViewInit, OnDestroy {
 
     if (this.option.enableHeaderClick) {
       this.grid.onHeaderClick.subscribe(
-        (function (scope) {
-          return function (event, args) {
+        ((scope) => {
+          return (event, args) => {
 
             if (scope.columnResized) {
               scope.columnResized = false;
@@ -1311,8 +1321,8 @@ export class GridComponent implements AfterViewInit, OnDestroy {
 
     if (this.option.editable) {
       this.grid.onActiveCellChanged.subscribe(
-        (function (scope) {
-          return function (event, args) {
+        ((scope) => {
+          return (_event, args) => {
             setTimeout(() => {
               if (scope.grid && args.row && args.cell) {
                 $(scope.grid.getCellNode(args.row, args.cell)).find('input').focus();
@@ -1333,8 +1343,8 @@ export class GridComponent implements AfterViewInit, OnDestroy {
         $('.slick-viewport').css('top', this.option.headerRowHeight + 30 + 'px');
       }
       this.grid.onHeaderRowCellRendered.subscribe(
-        (function (scope) {
-          return function (event, args) {
+        ((scope) => {
+          return (_event, args) => {
             scope.onHeaderRowCellRendered.emit(args);
 
           };
@@ -1347,15 +1357,17 @@ export class GridComponent implements AfterViewInit, OnDestroy {
     //  - 헤더 아래 컬럼이 render 했을때
     // -----------------------------------------------------------------------------------------------------------------
     this.grid.onColumnsResized.subscribe(
-      (function (scope) {
-        return function (event, args) {
+      ((scope) => {
+        return (_event, _args) => {
           for (let i = 0, totI = scope.grid.getColumns().length; i < totI; i++) {
-            let column = scope.grid.getColumns()[i];
+            const column = scope.grid.getColumns()[i];
             scope.columnResized = true;
-            //Check if column width has changed
-            if (column.width != column.previousWidth) {
-              scope.onColumnResize.emit({ idx: i, name: column.id, width: column.width });
-              setTimeout(function () { scope.columnResized = false; }, 300);
+            // Check if column width has changed
+            if (column.width !== column.previousWidth) {
+              scope.onColumnResize.emit({idx: i, name: column.id, width: column.width});
+              setTimeout(() => {
+                scope.columnResized = false;
+              }, 300);
             }
           }
         }
@@ -1369,7 +1381,7 @@ export class GridComponent implements AfterViewInit, OnDestroy {
     // this.grid.onScroll.subscribe(
     //   (function(scope) {
     //     return function () {
-    //       console.info('arguments =-- > ', arguments);
+    //       console.log('arguments =-- > ', arguments);
     //     }
     //   })(this)
     // );
@@ -1390,7 +1402,7 @@ export class GridComponent implements AfterViewInit, OnDestroy {
 
   private initRowSelectionModel(scope) {
     scope.grid.setSelectionModel(
-      new Slick.RowSelectionModel({ selectActiveRow: false })
+      new Slick.RowSelectionModel({selectActiveRow: false})
     );
   }
 
@@ -1403,7 +1415,7 @@ export class GridComponent implements AfterViewInit, OnDestroy {
    * @param {string[]} searchFields
    * @returns {boolean}
    */
-  private static isAllSearch(searchFields: string[]): boolean {
+  private isAllSearch(searchFields: string[]): boolean {
     return searchFields.length === 0;
   }
 
@@ -1474,7 +1486,7 @@ export class GridComponent implements AfterViewInit, OnDestroy {
   private getRowByRowIndex(rowIndex: number, scope: any = null): any | number {
     const fnScope: any = scope === null ? this : scope;
     const fnRowIndex: number = typeof rowIndex !== 'number' ? Number(rowIndex) : rowIndex;
-    const row: Object = fnScope.dataView.getItemByIdx(fnRowIndex);
+    const row: object = fnScope.dataView.getItemByIdx(fnRowIndex);
     return typeof row === 'undefined' ? fnScope.ROW_EMPTY : row;
   }
 
@@ -1533,7 +1545,7 @@ export class GridComponent implements AfterViewInit, OnDestroy {
    * @param {header[]} headers
    * @param {Option} option
    */
-  private validationParams(headers: header[], option: Option): void {
+  private validationParams(headers: Header[], option: Option): void {
 
     // Header 검사
     if (0 === headers.length) {
@@ -1556,7 +1568,7 @@ export class GridComponent implements AfterViewInit, OnDestroy {
   private initCellExternalCopyManager(scope): void {
 
     scope.grid.setSelectionModel(
-      new Slick.CellSelectionModel({ selectActiveRow: false })
+      new Slick.CellSelectionModel({selectActiveRow: false})
     );
 
     const cellCopyManager = new Slick.CellExternalCopyManager();
@@ -1617,29 +1629,17 @@ export class GridComponent implements AfterViewInit, OnDestroy {
   }
 
   /**
-   *
-   * @param e
-   * @returns {boolean}
-   */
-  private isIdPropertyAreaDrag(e): boolean {
-    return e.target.className.indexOf('dual_selection_idProperty') === -1;
-  }
-
-  /**
    * TimeStamp 생성
    * @returns {string}
    */
   private createTimeStamp(): string {
-
     const date: Date = new Date();
-    const timestamp: string =
-      date.getFullYear().toString() +
+    return date.getFullYear().toString() +
       (date.getMonth() + 1).toString() +
       date.getDate().toString() +
       date.getHours().toString() +
       date.getMinutes().toString() +
       date.getMilliseconds().toString();
-    return timestamp;
   }
 
   /**
@@ -1648,12 +1648,11 @@ export class GridComponent implements AfterViewInit, OnDestroy {
    */
   private generateUUID(): string {
     let d = new Date().getTime();
-    let uuid = 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, function (c) {
-      let r = (d + Math.random() * 16) % 16 | 0;
+    return 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, (c) => {
+      const r = (d + Math.random() * 16) % 16 | 0;
       d = Math.floor(d / 16);
-      return (c == 'x' ? r : (r & 0x3 | 0x8)).toString(16);
+      return (c === 'x' ? r : (r & 0x3 | 0x8)).toString(16);
     });
-    return uuid;
   }
 
   /**
@@ -1662,17 +1661,17 @@ export class GridComponent implements AfterViewInit, OnDestroy {
    * @param filename
    */
   private downloadCSV(csv, filename): void {
-    saveAs(new Blob(['\ufeff' + csv], { type: 'application/csv;charset=utf-8' }), filename + '.csv');
+    saveAs(new Blob(['\ufeff' + csv], {type: 'application/csv;charset=utf-8'}), filename + '.csv');
   }
 
-  /**
-   * Excel download 실행
-   * @param xlsx
-   * @param filename
-   */
-  private downloadExcel(xlsx, filename): void {
-    saveAs(new Blob(['\ufeff' + xlsx], { type: 'application/vnd.ms-excel;charset=charset=utf-8' }), filename + '.xls');
-  }
+  // /**
+  //  * Excel download 실행
+  //  * @param xlsx
+  //  * @param filename
+  //  */
+  // private downloadExcel(xlsx, filename): void {
+  //   saveAs(new Blob(['\ufeff' + xlsx], {type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet;charset=charset=utf-8'}), filename + '.xlsx');
+  // }
 
   /**
    * 클릭 이벤트 > 로우 선택 표시
@@ -1683,7 +1682,7 @@ export class GridComponent implements AfterViewInit, OnDestroy {
    */
   private rowClickWithCtrlShiftOption(scope: any, row: any, result: { event: any; row: any; selected: any; error: boolean }, rowIndex: number): void {
 
-    let selectedRows : any[] = [];
+    let selectedRows: any[] = [];
     const hasRow: any[] = scope.getSelectedRows()
       .filter(selectedRow => String(selectedRow[this.ID_PROPERTY]) === String(row[this.ID_PROPERTY]));
     result.selected = hasRow.length <= 0;
@@ -1704,8 +1703,8 @@ export class GridComponent implements AfterViewInit, OnDestroy {
     } else {
       if ((result.event.metaKey === false && result.event.ctrlKey === false) && result.event.shiftKey === false) {
 
-        if (scope.grid.getSelectedRows().indexOf(row['_idProperty_']-1) > -1) {
-          scope.grid.setSelectedRows([row['_idProperty_']-1]);
+        if (scope.grid.getSelectedRows().indexOf(row['_idProperty_'] - 1) > -1) {
+          scope.grid.setSelectedRows([row['_idProperty_'] - 1]);
         }
       } else {
         selectedRows = scope.grid.getSelectedRows().filter(selectedRowIndex => String(selectedRowIndex) !== String(rowIndex));

@@ -12,30 +12,27 @@
  * limitations under the License.
  */
 
-import {AbstractPopupComponent} from '../../../common/component/abstract-popup.component';
-import {Component, ElementRef, Injector, Input, OnDestroy, OnInit, ViewChild} from '@angular/core';
-import {
-  FileFormat, PrDatasetHive, PrDatasetJdbc,
-  RsType
-} from '../../../domain/data-preparation/pr-dataset';
-import {PopupService} from '../../../common/service/popup.service';
-import {DatasetService} from '../service/dataset.service';
-import {isNullOrUndefined, isUndefined} from 'util';
-import {StringUtil} from '../../../common/util/string.util';
-import {Alert} from '../../../common/util/alert.util';
 import * as _ from 'lodash';
-import { concatMap } from 'rxjs/operators';
-import { from} from "rxjs/observable/from";
-import {DataflowService} from "../../dataflow/service/dataflow.service";
-import {PrDataflow} from "../../../domain/data-preparation/pr-dataflow";
-import {PreparationCommonUtil} from "../../util/preparation-common.util";
+import {isNullOrUndefined, isUndefined} from 'util';
+import {Component, ElementRef, Injector, Input, OnDestroy, OnInit, ViewChild} from '@angular/core';
+import {StringUtil} from '@common/util/string.util';
+import {Alert} from '@common/util/alert.util';
+import {PopupService} from '@common/service/popup.service';
+import {AbstractPopupComponent} from '@common/component/abstract-popup.component';
+import {PrDataflow} from '@domain/data-preparation/pr-dataflow';
+import {FileFormat, PrDatasetHive, PrDatasetJdbc, RsType} from '@domain/data-preparation/pr-dataset';
+import {PreparationCommonUtil} from '../../util/preparation-common.util';
+import {DataflowService} from '../../dataflow/service/dataflow.service';
+import {DatasetService} from '../service/dataset.service';
+
 declare let moment;
+declare let async;
 
 @Component({
   selector: 'app-create-dataset-name',
   templateUrl: './create-dataset-name.component.html'
 })
-export class CreateDatasetNameComponent extends AbstractPopupComponent implements OnInit, OnDestroy  {
+export class CreateDatasetNameComponent extends AbstractPopupComponent implements OnInit, OnDestroy {
 
   /*-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=
   | Private Variables
@@ -56,10 +53,10 @@ export class CreateDatasetNameComponent extends AbstractPopupComponent implement
   public datasetJdbc: PrDatasetJdbc;
 
   @Input()
-  public datasetFiles : any;
+  public datasetFiles: any;
 
   @Input() // [DB, STAGING, FILE]
-  public type : string;
+  public type: string;
 
   @Input()
   public isFromDatasetList: boolean = true;
@@ -74,17 +71,17 @@ export class CreateDatasetNameComponent extends AbstractPopupComponent implement
   public flag: boolean = false;
 
   @ViewChild('nameElement')
-  public nameElement : ElementRef;
+  public nameElement: ElementRef;
 
-  public datasetInfo : DatasetInfo[] = [];
+  public datasetInfo: DatasetInfo[] = [];
   public fileExtension: string;
 
   public dsfileInformations: any;
 
   public isMultiSheet: boolean = false;
-  public names : string [] = [];
-  public clonedNames:string[] = [];
-  public descriptions : string [] = [];
+  public names: string [] = [];
+  public clonedNames: string[] = [];
+  public descriptions: string [] = [];
   public nameErrors: string[] = [];
   public descriptionErrors: string[] = [];
   public currentIndex: number = 0;
@@ -94,6 +91,7 @@ export class CreateDatasetNameComponent extends AbstractPopupComponent implement
   public isChecked: boolean = true; // jump to dataflow main grid
 
   public prepCommonUtil = PreparationCommonUtil;
+
   /*-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=
 
   /*-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=
@@ -154,7 +152,7 @@ export class CreateDatasetNameComponent extends AbstractPopupComponent implement
 
 
     // description validation
-    this.descriptions.forEach((item, index) => {
+    this.descriptions.forEach((_item, index) => {
       if (!StringUtil.isEmpty(this.descriptions[index]) && this.descriptions[index].length > 150) {
         this.descriptionErrors[index] = this.translateService.instant('msg.dp.alert.description.error.description');
       }
@@ -186,11 +184,11 @@ export class CreateDatasetNameComponent extends AbstractPopupComponent implement
     if (this.type === 'FILE' || 'URL' === this.type) {
 
       // List of parameters used to make multiple dataSets
-      const params = this.names.map((name:string,index:number) => {
+      const fileParams = this.names.map((name: string, index: number) => {
         this.datasetFiles[this.dsfileInformations[index].datasetFileIndex].dsName = name;
         this.datasetFiles[this.dsfileInformations[index].datasetFileIndex].dsDesc = this.descriptions[index];
         this.datasetFiles[this.dsfileInformations[index].datasetFileIndex].sheetName = this.dsfileInformations[index].sheetName;
-        if (this.datasetFiles[this.dsfileInformations[index].datasetFileIndex].fileFormat != FileFormat.JSON) {
+        if (this.datasetFiles[this.dsfileInformations[index].datasetFileIndex].fileFormat !== FileFormat.JSON) {
           this.datasetFiles[this.dsfileInformations[index].datasetFileIndex].manualColumnCount = this.dsfileInformations[index].manualColumnCount;
         }
         return this._getFileParams(this.datasetFiles[this.dsfileInformations[index].datasetFileIndex]);
@@ -200,25 +198,25 @@ export class CreateDatasetNameComponent extends AbstractPopupComponent implement
       // used concatMap to send multiple sequential HTTP requests
       this.flag = true;
       this.results = [];
-      const streams = from(params).pipe(
-        concatMap(stream => this._createFileDataset(stream)
-          .catch((error) => {
-            console.info(error)
-          })));
+
+      const procFileDs: ((callback) => void)[] = [];
+      fileParams.forEach(param => {
+        procFileDs.push((callback) => {
+          this._createFileDataset(param).then( result => {
+            if (result) {
+              this.results.push({dsId: result.dsId, dsName: result.dsName, link: result['_links'].self.href});
+            }
+            callback();
+          }).catch((err) => {
+            console.error( err );
+            callback();
+          });
+        });
+      });
 
       this.loadingShow();
-      streams.subscribe((result) => {
 
-        // push only successful result into an array
-        // because this information is required in
-        // complete() but no way to access them
-        if (result) {
-          this.results.push({dsId: result.dsId, dsName: result.dsName, link : result['_links'].self.href});
-        }
-
-      },(error) => {
-        console.error(error);
-      },() => {
+      async.waterfall(procFileDs, () => {
 
         this.flag = false;
         this.loadingHide();
@@ -226,7 +224,7 @@ export class CreateDatasetNameComponent extends AbstractPopupComponent implement
         // Find number of errors
         const errorNum = this.names.length - this.results.length;
         if (errorNum > 0) {
-          Alert.error(this.translateService.instant('msg.dp.alert.num.fail.dataset', {value : errorNum}));
+          Alert.error(this.translateService.instant('msg.dp.alert.num.fail.dataset', {value: errorNum}));
         }
 
         // 데이터셋 리스트에서 진입과 체크됐다면(데이터플로우로 바로 이동)
@@ -240,7 +238,7 @@ export class CreateDatasetNameComponent extends AbstractPopupComponent implement
             data: this.results.length > 0 ? this.results[0].dsId : null
           });
         }
-      })
+      });
 
     }
 
@@ -252,14 +250,14 @@ export class CreateDatasetNameComponent extends AbstractPopupComponent implement
    */
   private _makeShortCutToDataFlow() {
 
-    let today = moment();
+    const today = moment();
     const df = new PrDataflow();
     this.loadingShow();
 
     // 데이터셋이 생성이 됐다면 데이터플로우 생성을 한다.
     if (this.results[0] && !isNullOrUndefined(this.results[0].link)) {
       df.datasets = [this.results[0].link];
-      df.dfName = `${this.results[0].dsName}_${today.format('MM')}${today.format('DD')}_${today.format('HH')}${today.format('mm')}`  ;
+      df.dfName = `${this.results[0].dsName}_${today.format('MM')}${today.format('DD')}_${today.format('HH')}${today.format('mm')}`;
 
       // 1. create dataflow with dataset
       this.dataflowService.createDataflow(df).then((result1) => {
@@ -310,7 +308,7 @@ export class CreateDatasetNameComponent extends AbstractPopupComponent implement
     } else if (this.type === 'URL') {
       this.popupService.notiPopup({
         name: 'select-url',
-        data : null
+        data: null
       })
     }
   }
@@ -318,7 +316,7 @@ export class CreateDatasetNameComponent extends AbstractPopupComponent implement
 
   /**
    * close popup
-   * */
+   */
   public close() {
     super.close();
 
@@ -332,7 +330,7 @@ export class CreateDatasetNameComponent extends AbstractPopupComponent implement
   /**
    * show/hide error msg
    * @param index
-   * */
+   */
   public hideNameError(index: number) {
     if (isUndefined(this.names[index]) || this.names[index].length > 0 || this.names[index].length <= 150) {
       this.showNameError = false;
@@ -343,7 +341,7 @@ export class CreateDatasetNameComponent extends AbstractPopupComponent implement
   /**
    * show/hide error msg
    * @param index
-   * */
+   */
   public hideDescError(index: number) {
     if (isUndefined(this.descriptions[index]) || this.descriptions[index].length <= 150) {
       this.showDescError = false;
@@ -353,11 +351,11 @@ export class CreateDatasetNameComponent extends AbstractPopupComponent implement
 
   /**
    * Error action
-   * @param error
+   * @param _error
    */
-  public errorAction(error) {
+  public errorAction(_error) {
     this.flag = false;
-    Alert.error(this.translateService.instant('msg.dp.alert.num.fail.dataset', {value : 1}));
+    Alert.error(this.translateService.instant('msg.dp.alert.num.fail.dataset', {value: 1}));
     this.close();
   }
 
@@ -365,7 +363,7 @@ export class CreateDatasetNameComponent extends AbstractPopupComponent implement
   /**
    * Check if next button is disabled or not
    */
-  public isBtnDisabled() : boolean {
+  public isBtnDisabled(): boolean {
     return this.showNameError || this.showDescError;
   }
 
@@ -390,7 +388,7 @@ export class CreateDatasetNameComponent extends AbstractPopupComponent implement
 
     if (this.names[index].length > 149 && this.isKeyPressedWithChar(event.keyCode) && !this.isMaxLengthError) {
       this.isMaxLengthError = true;
-      if(this.type !== 'FILE') {
+      if (this.type !== 'FILE') {
         this.showNameError = true;
       }
       this.nameErrors[index] = this.translateService.instant('msg.dp.ui.max.length.error');
@@ -434,7 +432,7 @@ export class CreateDatasetNameComponent extends AbstractPopupComponent implement
    * @param keyCode
    */
   public isKeyPressedWithChar(keyCode: number): boolean {
-    const exceptionList: number[] = [8,9,13,16,17,18,19,20,27,33,34,35,36,37,38,39,40,45,46,91,92,219,220,93,144,145];
+    const exceptionList: number[] = [8, 9, 13, 16, 17, 18, 19, 20, 27, 33, 34, 35, 36, 37, 38, 39, 40, 45, 46, 91, 92, 219, 220, 93, 144, 145];
     return exceptionList.indexOf(keyCode) === -1
   }
 
@@ -461,6 +459,7 @@ export class CreateDatasetNameComponent extends AbstractPopupComponent implement
     return result;
 
   }
+
   /*-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=
   | Protected Method
   |-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=*/
@@ -473,53 +472,53 @@ export class CreateDatasetNameComponent extends AbstractPopupComponent implement
    * @param {string} type
    * @private
    */
-  private _setDefaultDatasetName(type : string) : void {
+  private _setDefaultDatasetName(type: string): void {
 
     if ('FILE' === type || 'URL' === type) {
 
       // FIXME: no idea why dsfileInformations is used instead of datasetInfo
-      this.datasetFiles.forEach((dsFile, index)=>{
-        if(dsFile.sheetInfo){
-          if(dsFile.fileFormat === FileFormat.EXCEL){
-            dsFile.sheetInfo.forEach((sheet)=>{
-              if (sheet.selected){
-                let name = `${dsFile.fileName} - ${sheet.sheetName}`;
-                this.names.push(name.slice(0,150));
+      this.datasetFiles.forEach((dsFile, index) => {
+        if (dsFile.sheetInfo) {
+          if (dsFile.fileFormat === FileFormat.EXCEL) {
+            dsFile.sheetInfo.forEach((sheet) => {
+              if (sheet.selected) {
+                const name = `${dsFile.fileName} - ${sheet.sheetName}`;
+                this.names.push(name.slice(0, 150));
                 this.descriptions.push('');
                 this.nameErrors.push('');
                 this.descriptionErrors.push('');
                 this.dsfileInformations.push({
-                  datasetFileIndex : index,
+                  datasetFileIndex: index,
                   fileName: dsFile.filenameBeforeUpload,
                   fileFormat: dsFile.fileFormat.toString(),
-                  sheetName:sheet.sheetName,
-                  manualColumnCount:sheet.columnCount,
+                  sheetName: sheet.sheetName,
+                  manualColumnCount: sheet.columnCount,
                   svg: dsFile.fileFormat.toUpperCase(),
                 });
               }
             })
           } else {
-            if(dsFile.selected){
-              let name = `${dsFile.fileName}.${dsFile.fileExtension}`;
-              this.names.push(name.slice(0,150));
+            if (dsFile.selected) {
+              const name = `${dsFile.fileName}.${dsFile.fileExtension}`;
+              this.names.push(name.slice(0, 150));
               this.descriptions.push('');
               this.nameErrors.push('');
               this.descriptionErrors.push('');
-              if (dsFile.fileFormat === FileFormat.JSON ){
+              if (dsFile.fileFormat === FileFormat.JSON) {
                 this.dsfileInformations.push({
-                  datasetFileIndex : index,
+                  datasetFileIndex: index,
                   fileName: dsFile.filenameBeforeUpload,
                   fileFormat: dsFile.fileFormat.toString(),
-                  sheetName:'',
+                  sheetName: '',
                   svg: dsFile.fileFormat.toUpperCase(),
                 });
               } else {
                 this.dsfileInformations.push({
-                  datasetFileIndex : index,
+                  datasetFileIndex: index,
                   fileName: dsFile.filenameBeforeUpload,
                   fileFormat: dsFile.fileFormat.toString(),
-                  sheetName:'',
-                  manualColumnCount:dsFile.sheetInfo[0].columnCount,
+                  sheetName: '',
+                  manualColumnCount: dsFile.sheetInfo[0].columnCount,
                   svg: dsFile.fileFormat.toUpperCase(),
                 });
               }
@@ -551,7 +550,9 @@ export class CreateDatasetNameComponent extends AbstractPopupComponent implement
     // For placeholder
     this.clonedNames = _.cloneDeep(this.names);
 
-    this.nameElement && setTimeout(() => { this.nameElement.nativeElement.select(); });
+    this.nameElement && setTimeout(() => {
+      this.nameElement.nativeElement.select();
+    });
   } // function - _setDefaultDatasetName
 
 
@@ -568,15 +569,15 @@ export class CreateDatasetNameComponent extends AbstractPopupComponent implement
         if ('FILE' === this.type) {
 
           this.datasetInfo.push({
-            name : this.translateService.instant('msg.dp.ui.list.file'),
-            value : this.datasetFiles[0].fileName,
-            svg : this.prepCommonUtil.getFileFormatWithExtension(ext).toString()
+            name: this.translateService.instant('msg.dp.ui.list.file'),
+            value: this.datasetFiles[0].fileName,
+            svg: this.prepCommonUtil.getFileFormatWithExtension(ext).toString()
           });
         } else {
           this.datasetInfo.push({
-            name : `URL(${this.prepCommonUtil.getFileFormatWithExtension(ext)})`,
-            value : this.datasetFiles[0].storedUri,
-            svg : this.prepCommonUtil.getFileFormatWithExtension(ext).toString()
+            name: `URL(${this.prepCommonUtil.getFileFormatWithExtension(ext)})`,
+            value: this.datasetFiles[0].storedUri,
+            svg: this.prepCommonUtil.getFileFormatWithExtension(ext).toString()
           });
         }
 
@@ -590,40 +591,40 @@ export class CreateDatasetNameComponent extends AbstractPopupComponent implement
 
     } else if ('DB' === this.type) {
 
-      let ds = this.datasetJdbc;
+      const ds = this.datasetJdbc;
 
       // TYPE
       this.datasetInfo.push({
-        name : this.translateService.instant('msg.comm.th.type'),
-        value : `DB(${ds.dataconnection['connection'].implementor})`,
-        svg : ds.dataconnection['connection'].implementor,
+        name: this.translateService.instant('msg.comm.th.type'),
+        value: `DB(${ds.dataconnection['connection'].implementor})`,
+        svg: ds.dataconnection['connection'].implementor,
       });
 
       if (this.datasetJdbc.rsType === RsType.TABLE) {
 
         // DATABASE NAME
         this.datasetInfo.push({
-          name : this.translateService.instant('msg.dp.th.database'),
-          value : ds.tableInfo.databaseName
+          name: this.translateService.instant('msg.dp.th.database'),
+          value: ds.tableInfo.databaseName
         });
 
         // TABLE NAME
         this.datasetInfo.push({
-          name : this.translateService.instant('msg.dp.th.ss.table'),
-          value : ds.tableInfo.tableName
+          name: this.translateService.instant('msg.dp.th.ss.table'),
+          value: ds.tableInfo.tableName
         });
 
       } else {
 
         this.datasetInfo.push({
-          name : this.translateService.instant('msg.dp.th.database'),
-          value : ds.sqlInfo.databaseName
+          name: this.translateService.instant('msg.dp.th.database'),
+          value: ds.sqlInfo.databaseName
         });
 
         // QUERY STATEMENT
         this.datasetInfo.push({
-          name : this.translateService.instant('msg.dp.btn.query'),
-          value : ds.sqlInfo.queryStmt
+          name: this.translateService.instant('msg.dp.btn.query'),
+          value: ds.sqlInfo.queryStmt
         });
 
       }
@@ -632,31 +633,34 @@ export class CreateDatasetNameComponent extends AbstractPopupComponent implement
 
         // HOST & PORT
         this.datasetInfo.push(
-          {name : this.translateService.instant('msg.comm.th.host'), value : ds.dataconnection['connection'].hostname},
-          {name : this.translateService.instant('msg.comm.th.port'), value : ds.dataconnection['connection'].port}
+          {name: this.translateService.instant('msg.comm.th.host'), value: ds.dataconnection['connection'].hostname},
+          {name: this.translateService.instant('msg.comm.th.port'), value: ds.dataconnection['connection'].port}
         );
       } else {
 
         // URL
         this.datasetInfo.push(
-          {name : this.translateService.instant('msg.nbook.th.url'), value : ds.dataconnection['connection'].url}
+          {name: this.translateService.instant('msg.nbook.th.url'), value: ds.dataconnection['connection'].url}
         );
       }
 
     } else if ('STAGING' === this.type) {
       this.datasetInfo.push({
-        name : this.translateService.instant('msg.comm.th.type'),
-        value : 'STAGING_DB',
-        svg : 'HIVE'
+        name: this.translateService.instant('msg.comm.th.type'),
+        value: 'STAGING_DB',
+        svg: 'HIVE'
       });
 
       if (this.datasetHive.rsType === RsType.TABLE) {
         this.datasetInfo.push(
-          {name : this.translateService.instant('msg.dp.th.database'), value : this.datasetHive.tableInfo.databaseName},
-          {name : this.translateService.instant('msg.dp.th.ss.table'), value : this.datasetHive.tableInfo.tableName}
+          {name: this.translateService.instant('msg.dp.th.database'), value: this.datasetHive.tableInfo.databaseName},
+          {name: this.translateService.instant('msg.dp.th.ss.table'), value: this.datasetHive.tableInfo.tableName}
         );
       } else {
-        this.datasetInfo.push({name : this.translateService.instant('msg.dp.btn.query'), value : this.datasetHive.sqlInfo.queryStmt});
+        this.datasetInfo.push({
+          name: this.translateService.instant('msg.dp.btn.query'),
+          value: this.datasetHive.sqlInfo.queryStmt
+        });
       }
 
     }
@@ -681,14 +685,13 @@ export class CreateDatasetNameComponent extends AbstractPopupComponent implement
     return hive
   }
 
-
   /**
    * Returns parameter needed for creating jdbc dataset
    * @param jdbc
    * @returns {Object}
    * @private
    */
-  private _getJdbcParams(jdbc) : object {
+  private _getJdbcParams(jdbc): object {
 
     // For postgre dbName is database not databaseName!
     if (jdbc.rsType === RsType.QUERY) {
@@ -709,13 +712,13 @@ export class CreateDatasetNameComponent extends AbstractPopupComponent implement
    */
   private _getFileParams(file): object {
     const params: any = {};
-    if (file.fileFormat === FileFormat.EXCEL){
+    if (file.fileFormat === FileFormat.EXCEL) {
       params.delimiter = ',';
     } else {
       params.delimiter = file.delimiter;
     }
 
-    if (file.fileFormat === FileFormat.CSV || file.fileFormat === FileFormat.TXT ){
+    if (file.fileFormat === FileFormat.CSV || file.fileFormat === FileFormat.TXT) {
       params.quoteChar = file.quoteChar;
     }
 
@@ -724,7 +727,7 @@ export class CreateDatasetNameComponent extends AbstractPopupComponent implement
     params.dsType = 'IMPORTED';
     if (this.type === 'FILE') {
       params.importType = 'UPLOAD';
-    } else if(this.type === 'URL') {
+    } else if (this.type === 'URL') {
       params.importType = 'URI';
     } else {
       params.importType = 'UPLOAD';
@@ -739,19 +742,18 @@ export class CreateDatasetNameComponent extends AbstractPopupComponent implement
   }
 
 
-
   /**
    * Create dataset (call API)
    * @param {Object} params
    * (staging and db)
    * @private
    */
-  private _createDataset(params : object) {
+  private _createDataset(params: object) {
 
-    let type = this.type === 'DB' ? this.datasetJdbc : this.datasetHive;
+    const type = this.type === 'DB' ? this.datasetJdbc : this.datasetHive;
 
-    let tableInfo = type.tableInfo;
-    let sqlInfo = type.sqlInfo;
+    const tableInfo = type.tableInfo;
+    const sqlInfo = type.sqlInfo;
 
     // delete - only use in UI
     delete type.tableInfo;
@@ -759,17 +761,18 @@ export class CreateDatasetNameComponent extends AbstractPopupComponent implement
 
     // Error when creating dataflow with dataset with no querystmt
     if (type.rsType === RsType.TABLE) {
-      var databaseName = tableInfo.databaseName;
-      var tableName = tableInfo.tableName;
-      if(type.dataconnection.connection.implementor==="POSTGRESQL") {
-        if( /^[a-z0-9]+$/.test(databaseName) === false ) {
+      let databaseName = tableInfo.databaseName;
+      let tableName = tableInfo.tableName;
+      if (type.dataconnection.connection.implementor === 'POSTGRESQL') {
+        if (/^[a-z0-9]+$/.test(databaseName) === false) {
           databaseName = `"${databaseName}"`;
         }
-        if( /^[a-z0-9]+$/.test(tableName) === false ) {
+        if (/^[a-z0-9]+$/.test(tableName) === false) {
           tableName = `"${tableName}"`;
         }
       }
-      params['queryStmt'] = `select * from ${databaseName}.${tableName}`;
+      params['queryStmt'] = `select *
+                             from ${databaseName}.${tableName}`;
     }
 
     this.loadingShow();
@@ -779,7 +782,7 @@ export class CreateDatasetNameComponent extends AbstractPopupComponent implement
       this.loadingHide();
       if (result) {
         this.results = [];
-        this.results.push({dsId: result.dsId, dsName: result.dsName, link : result['_links'].self.href});
+        this.results.push({dsId: result.dsId, dsName: result.dsName, link: result['_links'].self.href});
         if (this.isChecked && this.isFromDatasetList) {
           this._makeShortCutToDataFlow();
         } else {
@@ -812,9 +815,7 @@ export class CreateDatasetNameComponent extends AbstractPopupComponent implement
    */
   private _createFileDataset(param): Promise<any> {
     return new Promise((resolve, reject) => {
-      this.datasetService.createDataSet(param).
-      then(result => resolve(result)).
-      catch(error => reject(error));
+      this.datasetService.createDataSet(param).then(result => resolve(result)).catch(error => reject(error));
     });
   }
 
@@ -822,8 +823,8 @@ export class CreateDatasetNameComponent extends AbstractPopupComponent implement
 }
 
 class DatasetInfo {
-  name : string;
-  value : any;
+  name: string;
+  value: any;
   svg?: string;
 }
 

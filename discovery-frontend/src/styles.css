@@ -1,3 +1,4 @@
+@charset "utf-8";
 /*
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -13,7 +14,6 @@
  */
 
 /* You can add global styles to this file, and also import other style files */
-@charset "utf-8";
 
 /************************************************************************************************************
    Common css Import
@@ -28,3 +28,12 @@
 input:-webkit-autofill {
   background-color: red !important;
 }
+
+.rs-component-btn-icon1.type-clipboard {
+  width: 17px;
+  height: 17px;
+  background-position: left -450px;
+}
+
+html.sys-embed-board,
+html.sys-embed-board body {min-width:600px !important; }

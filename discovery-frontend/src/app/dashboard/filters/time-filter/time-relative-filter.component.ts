@@ -12,7 +12,6 @@
  * limitations under the License.
  */
 
-import {AbstractFilterPopupComponent} from '../abstract-filter-popup.component';
 import {
   ElementRef,
   OnDestroy,
@@ -22,15 +21,17 @@ import {
   Input,
   SimpleChanges,
   SimpleChange,
-  EventEmitter, Output, ViewChild, AfterViewInit
+  EventEmitter, Output, ViewChild, AfterViewInit, OnChanges
 } from '@angular/core';
-import {TimeUnit} from '../../../domain/workbook/configurations/field/timestamp-field';
+import {EventBroadcaster} from '@common/event/event.broadcaster';
+
+import {TimeUnit} from '@domain/workbook/configurations/field/timestamp-field';
 import {
   TimeRelativeFilter,
   TimeRelativeTense
-} from '../../../domain/workbook/configurations/filter/time-relative-filter';
-import {isNullOrUndefined} from 'util';
-import {EventBroadcaster} from '../../../common/event/event.broadcaster';
+} from '@domain/workbook/configurations/filter/time-relative-filter';
+
+import {AbstractFilterPopupComponent} from '../abstract-filter-popup.component';
 
 declare let moment;
 
@@ -38,7 +39,7 @@ declare let moment;
   selector: 'app-time-relative-filter',
   templateUrl: './time-relative-filter.component.html'
 })
-export class TimeRelativeFilterComponent extends AbstractFilterPopupComponent implements OnInit, AfterViewInit, OnDestroy {
+export class TimeRelativeFilterComponent extends AbstractFilterPopupComponent implements OnInit, OnChanges, AfterViewInit, OnDestroy {
   /*-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=
   | Private Variables
   |-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=*/
@@ -77,7 +78,7 @@ export class TimeRelativeFilterComponent extends AbstractFilterPopupComponent im
   public mode: string = 'CHANGE';             // CHANGE, PANEL, WIDGET
 
   // 필터 변경 이벤트
-  @Output('change')
+  @Output()
   public changeEvent: EventEmitter<TimeRelativeFilter> = new EventEmitter();
 
   public isShortLabel: boolean = false;
@@ -111,7 +112,8 @@ export class TimeRelativeFilterComponent extends AbstractFilterPopupComponent im
   public ngOnChanges(changes: SimpleChanges) {
     const filterChanges: SimpleChange = changes.inputFilter;
     if (filterChanges && filterChanges.currentValue) {
-      this.setData(filterChanges.currentValue, !filterChanges.firstChange);
+      // this.setData(filterChanges.currentValue, !filterChanges.firstChange);
+      this.setData(filterChanges.currentValue);
     }
   } // function - ngOnChanges
 
@@ -153,13 +155,13 @@ export class TimeRelativeFilterComponent extends AbstractFilterPopupComponent im
    * @param {boolean} isBroadcast
    */
   public setData(filter: TimeRelativeFilter, isBroadcast: boolean = false) {
-    let tempFilter: TimeRelativeFilter = filter;
+    const tempFilter: TimeRelativeFilter = filter;
 
     {
       // 기본값 설정
       (tempFilter.hasOwnProperty('value') && 0 < tempFilter.value) || (tempFilter.value = 1);
       (tempFilter.tense) || (tempFilter.tense = TimeRelativeTense.PREVIOUS);
-      if (isNullOrUndefined(tempFilter.relTimeUnit)) {
+      if (this.isNullOrUndefined(tempFilter.relTimeUnit)) {
         tempFilter.relTimeUnit = TimeUnit.WEEK;
       }
       this.selectedTimeUnitItem = this.timeUnitComboList.find(item => item.value === tempFilter.relTimeUnit);
@@ -224,8 +226,8 @@ export class TimeRelativeFilterComponent extends AbstractFilterPopupComponent im
     }
 
     // 날짜 설정
-    let objDate = moment();
-    let strPreview: string = '';
+    const objDate = moment();
+    let strPreview: string;
     switch (this.targetFilter.tense) {
       case TimeRelativeTense.PREVIOUS :
         objDate.subtract(this.targetFilter.value, strManipulateKey);

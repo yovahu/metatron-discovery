@@ -13,15 +13,14 @@
  */
 
 import {Component, ElementRef, EventEmitter, Injector, Output, ViewChild} from '@angular/core';
-import {DataconnectionService} from '../../dataconnection/service/dataconnection.service';
-import {Alert} from '../../common/util/alert.util';
+import {Alert} from '@common/util/alert.util';
+import {CommonUtil} from '@common/util/common.util';
+import {CookieConstant} from '@common/constant/cookie.constant';
+import {StringUtil} from '@common/util/string.util';
+import {AbstractComponent} from '@common/component/abstract.component';
+import {DataconnectionService} from '@common/service/dataconnection.service';
+import {ConnectionComponent} from '../component/connection/connection.component';
 import {SetWorkspacePublishedComponent} from '../component/set-workspace-published/set-workspace-published.component';
-import {CommonUtil} from '../../common/util/common.util';
-import {CookieConstant} from '../../common/constant/cookie.constant';
-import {StringUtil} from '../../common/util/string.util';
-import {AbstractComponent} from "../../common/component/abstract.component";
-import {ConnectionComponent, ConnectionValid} from "../component/connection/connection.component";
-import * as _ from 'lodash';
 
 /**
  * Data connection create component
@@ -76,7 +75,8 @@ export class CreateConnectionComponent extends AbstractComponent {
     this.isShowConnectionNameRequired = undefined;
     this.published = undefined;
     // set private workspace in add workspace list
-    this.addWorkspaces = [JSON.parse(this.cookieService.get(CookieConstant.KEY.MY_WORKSPACE))];
+    const myWs = this.cookieService.get(CookieConstant.KEY.MY_WORKSPACE);
+    this.addWorkspaces = ( myWs ) ? [JSON.parse(myWs)] : [];
     // set connection type list
     // show popup
     this.isShowPopup = true;
@@ -169,7 +169,7 @@ export class CreateConnectionComponent extends AbstractComponent {
     this.loadingShow();
     // create connection
     this.connectionService.createConnection(this._getCreateConnectionParams())
-      .then((result) => {
+      .then(() => {
         // alert
         Alert.success(`'${this.connectionName.trim()}' ` + this.translateService.instant('msg.storage.alert.dconn.create.success'));
         // loading hide
@@ -188,7 +188,7 @@ export class CreateConnectionComponent extends AbstractComponent {
    * @private
    */
   public _getCreateConnectionParams() {
-    let result = this._connectionComponent.getConnectionParams(true);
+    const result = this._connectionComponent.getConnectionParams(true);
     result['type'] = 'JDBC';
     result['name'] = this.connectionName.trim();
     result['published'] = this.published;

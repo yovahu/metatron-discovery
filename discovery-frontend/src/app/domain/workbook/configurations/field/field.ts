@@ -84,8 +84,14 @@ export abstract class Field {
   // 수식이 포함된 컬럼여부
   aggregated?: boolean;
 
+  fieldFormat?: Format;
+
+  // for Combine Chart
+  isSecondaryAxis?: boolean;
+
+  // for Grid Chart
+  public color?: { schema? : { idx : number, key : string } , rgb? : string }
+
   // only used in UI
   isCustomField?: boolean;
-
-  fieldFormat?: Format;
 }

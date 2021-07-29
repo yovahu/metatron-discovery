@@ -11,55 +11,72 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-
+import * as _ from 'lodash';
+import {CommonUtil} from '@common/util/common.util';
+import {
+  IntervalFilter,
+  IntervalRelativeTimeType,
+  IntervalSelectorType
+} from '@domain/workbook/configurations/filter/interval-filter';
 import {
   InclusionFilter,
   InclusionItemSort,
   InclusionSelectorType,
   InclusionSortBy
-} from '../../domain/workbook/configurations/filter/inclusion-filter';
-import {BoundFilter} from '../../domain/workbook/configurations/filter/bound-filter';
+} from '@domain/workbook/configurations/filter/inclusion-filter';
 import {
   InequalityType,
   MeasureInequalityFilter
-} from '../../domain/workbook/configurations/filter/measure-inequality-filter';
-import {AggregationType} from '../../domain/workbook/configurations/field/measure-field';
-import {
-  MeasurePositionFilter,
-  PositionType
-} from '../../domain/workbook/configurations/filter/measure-position-filter';
-import {
-  ContainsType,
-  WildCardFilter
-} from '../../domain/workbook/configurations/filter/wild-card-filter';
-import {Datasource, Field} from '../../domain/datasource/datasource';
-import {BoardDataSource, Dashboard} from '../../domain/dashboard/dashboard';
-import {Filter} from '../../domain/workbook/configurations/filter/filter';
-import {ByTimeUnit, TimeUnit} from '../../domain/workbook/configurations/field/timestamp-field';
-import {TimeFilter} from '../../domain/workbook/configurations/filter/time-filter';
-import {isNullOrUndefined} from 'util';
-import {TimeListFilter} from '../../domain/workbook/configurations/filter/time-list-filter';
-import {TimeAllFilter} from '../../domain/workbook/configurations/filter/time-all-filter';
-import {TimeRangeFilter} from '../../domain/workbook/configurations/filter/time-range-filter';
-import {
-  TimeRelativeFilter,
-  TimeRelativeTense
-} from '../../domain/workbook/configurations/filter/time-relative-filter';
+} from '@domain/workbook/configurations/filter/measure-inequality-filter';
+import {BoundFilter} from '@domain/workbook/configurations/filter/bound-filter';
+import {AggregationType} from '@domain/workbook/configurations/field/measure-field';
+import {MeasurePositionFilter, PositionType} from '@domain/workbook/configurations/filter/measure-position-filter';
+import {ContainsType, WildCardFilter} from '@domain/workbook/configurations/filter/wild-card-filter';
+import {Datasource, Field} from '@domain/datasource/datasource';
+import {BoardDataSource, Dashboard} from '@domain/dashboard/dashboard';
+import {Filter} from '@domain/workbook/configurations/filter/filter';
+import {ByTimeUnit, TimeUnit} from '@domain/workbook/configurations/field/timestamp-field';
+import {TimeFilter} from '@domain/workbook/configurations/filter/time-filter';
+import {DIRECTION} from '@domain/workbook/configurations/sort';
+import {RegExprFilter} from '@domain/workbook/configurations/filter/reg-expr-filter';
+import {TimeListFilter} from '@domain/workbook/configurations/filter/time-list-filter';
+import {TimeAllFilter} from '@domain/workbook/configurations/filter/time-all-filter';
+import {TimeRangeFilter} from '@domain/workbook/configurations/filter/time-range-filter';
+import {TimeRelativeFilter, TimeRelativeTense} from '@domain/workbook/configurations/filter/time-relative-filter';
+
+import {TimezoneService} from '../../data-storage/service/timezone.service';
 import {DashboardUtil} from './dashboard.util';
-import {
-  IntervalFilter,
-  IntervalRelativeTimeType,
-  IntervalSelectorType
-} from '../../domain/workbook/configurations/filter/interval-filter';
-import {DIRECTION} from '../../domain/workbook/configurations/sort';
-import {RegExprFilter} from "../../domain/workbook/configurations/filter/reg-expr-filter";
-import {TimezoneService} from "../../data-storage/service/timezone.service";
+import {TimeDateFilter} from '@domain/workbook/configurations/filter/time-date-filter';
 
 declare let moment;
 
 export class FilterUtil {
 
-  public static CANDIDATE_LIMIT:number = 100;
+  public static CANDIDATE_LIMIT: number = 100;
+
+  /**
+   * 기본 필터 조회
+   * return Filter;
+   */
+  public static getDefaultFilters(filter: Filter, boardFilters: Filter[]): Filter[] {
+
+    if (!boardFilters) boardFilters = [];
+
+    let filters: Filter[] = [];
+    if (filter.ui) {
+      if (filter.ui.widgetId) {
+        // 차트필터 - 글로벌필터를 사전 필터로 추가
+        filters = filters.concat(boardFilters);
+      } else if (filter.ui.importanceType === 'general') {
+        // 필수 필터 추가
+        filters = filters.concat(boardFilters.filter(item => 'recommended' === item.ui.importanceType && item.ui.importanceType));
+      } else {
+        // 타임스탬프 + 자기보다 시퀀스가 낮은(우선순위가 높은) 필터
+        filters = filters.concat(boardFilters.filter(item => item.ui.filteringSeq < filter.ui.filteringSeq));
+      }
+    }
+    return filters;
+  } // function - getDefaultFilters
 
   /**
    * 필터 패널 내용 목록 조회
@@ -67,44 +84,54 @@ export class FilterUtil {
    * @param {Dashboard} dashboard
    * @param {Function} inclusionFilterFunc
    */
-  public static getPanelContentsList(filterList: Filter[], dashboard: Dashboard, inclusionFilterFunc: Function) {
+  public static getPanelContentsList(filterList: Filter[], dashboard: Dashboard, inclusionFilterFunc: (filter, field) => void) {
     filterList.forEach((filter: Filter) => {
-      filter['dsName'] = dashboard.dataSources.find( item => item.engineName === filter.dataSource ).name;
+      filter['dsName'] = dashboard.dataSources.find(item => item.engineName === filter.dataSource).name;
       filter['fieldObj'] = DashboardUtil.getFieldByName(dashboard, filter.dataSource, filter.field, filter.ref);
       if ('include' === filter.type) {
-        (inclusionFilterFunc) && (inclusionFilterFunc(<InclusionFilter>filter, filter['fieldObj']));
+        (inclusionFilterFunc) && (inclusionFilterFunc(filter as InclusionFilter, filter['fieldObj']));
       } else if ('bound' === filter.type) {
-        const boundFilter: BoundFilter = (<BoundFilter>filter);
+        const boundFilter: BoundFilter = filter as BoundFilter;
         filter['panelContents'] = boundFilter.min + ' ~ ' + boundFilter.max;
       } else if (FilterUtil.isTimeListFilter(filter)) {
-        const vals: string[] = (<TimeListFilter>filter).valueList;
+        const vals: string[] = (filter as TimeListFilter).valueList;
         if (vals && 0 < vals.length) {
           filter['panelContents'] = vals.join(' , ');
         } else {
           filter['panelContents'] = '(No time filtering)';
         }
       } else if (FilterUtil.isTimeRangeFilter(filter)) {
-        const timeRangeFilter: TimeRangeFilter = <TimeRangeFilter>filter;
+        const timeRangeFilter: TimeRangeFilter = filter as TimeRangeFilter;
         const intervals: string[] = timeRangeFilter.intervals;
         if (intervals && 0 < intervals.length) {
           filter['panelContents'] = intervals.map(item => {
             const arrInterval: any[] = item.split('/');
-
             if (TimeRangeFilter.EARLIEST_DATETIME !== arrInterval[0] && TimeRangeFilter.LATEST_DATETIME !== arrInterval[0]) {
               arrInterval[0] = FilterUtil.getDateTimeFormat(arrInterval[0], timeRangeFilter.timeUnit, true);
             }
             if (TimeRangeFilter.EARLIEST_DATETIME !== arrInterval[1] && TimeRangeFilter.LATEST_DATETIME !== arrInterval[1]) {
               arrInterval[1] = FilterUtil.getDateTimeFormat(arrInterval[1], timeRangeFilter.timeUnit, false);
             }
-
             return arrInterval[0] + '/' + arrInterval[1];
           });
           filter['panelContents'] = filter['panelContents'].join('<br>');
         } else {
           filter['panelContents'] = '(No time filtering)';
         }
+      } else if (FilterUtil.isTimeSingleFilter(filter)) {
+        const timeRangeFilter: TimeRangeFilter = filter as TimeRangeFilter;
+        const intervals: string[] = timeRangeFilter.intervals;
+        if (intervals && 0 < intervals.length) {
+          filter['panelContents'] = intervals.map(item => {
+            const arrInterval: any[] = item.split('/');
+            return arrInterval[0];
+          });
+          filter['panelContents'] = filter['panelContents'].join('<br>');
+        } else {
+          filter['panelContents'] = '(No time filtering)';
+        }
       } else if (FilterUtil.isTimeRelativeFilter(filter)) {
-        const timeFilter: TimeRelativeFilter = (<TimeRelativeFilter>filter);
+        const timeFilter: TimeRelativeFilter = filter as TimeRelativeFilter;
         filter['panelContents'] = timeFilter.value + ' ' + timeFilter.relTimeUnit.toString();
       } else if (FilterUtil.isTimeAllFilter(filter)) {
         filter['panelContents'] = '(No time filtering)';
@@ -121,7 +148,7 @@ export class FilterUtil {
   public static getBoardDataSourceForFilter(filter: Filter, board: Dashboard): BoardDataSource {
     const boardDataSource: BoardDataSource = board.configuration.dataSource;
     if ('multi' === boardDataSource.type) {
-      return boardDataSource.dataSources.find(item => item.engineName === filter.dataSource || (item.connType == 'LINK' && item.engineName.startsWith(filter.dataSource + '_')));
+      return boardDataSource.dataSources.find(item => item.engineName === filter.dataSource || (item.connType === 'LINK' && item.engineName.startsWith(filter.dataSource + '_')));
     } else {
       return boardDataSource;
     }
@@ -275,10 +302,10 @@ export class FilterUtil {
   /**
    * 기본 정규식 필터 생성
    * @param {string} fieldName
-   * @param preFilterData
+   * @param _preFilterData
    * @return {RegExprFilter}
    */
-  public static getBasicRegExprFilter(fieldName: string, preFilterData: any): RegExprFilter {
+  public static getBasicRegExprFilter(fieldName: string, _preFilterData: any): RegExprFilter {
     const regExprFilter = new RegExprFilter();
     regExprFilter.field = fieldName;
     regExprFilter.expr = '';
@@ -294,8 +321,8 @@ export class FilterUtil {
   public static convertToServerSpec(filter: Filter): Filter {
 
     // Time Range 필터의 타임 형식 설정
-    if (FilterUtil.isTimeRangeFilter(filter)) {
-      const timeRangeFilter: TimeRangeFilter = <TimeRangeFilter>filter;
+    if (FilterUtil.isTimeRangeFilter(filter) || FilterUtil.isTimeSingleFilter(filter)) {
+      const timeRangeFilter: TimeRangeFilter = filter as TimeRangeFilter;
       if (timeRangeFilter.intervals && 0 < timeRangeFilter.intervals.length) {
         timeRangeFilter.intervals.forEach((item: string, idx: number) => {
           const arrInterval: any[] = item.split('/');
@@ -314,7 +341,7 @@ export class FilterUtil {
       }
     } // end if - time_range
     else if (FilterUtil.isTimeRelativeFilter(filter)) {
-      const timeRelativeFilter: TimeRelativeFilter = <TimeRelativeFilter>filter;
+      const timeRelativeFilter: TimeRelativeFilter = filter as TimeRelativeFilter;
       if (timeRelativeFilter.clzField && timeRelativeFilter.clzField.format && TimezoneService.DISABLE_TIMEZONE_KEY === timeRelativeFilter.clzField.format.timeZone) {
         delete timeRelativeFilter.timeZone;
       } else {
@@ -345,6 +372,7 @@ export class FilterUtil {
         keyMap = ['relTimeUnit', 'tense', 'value', 'timeUnit', 'byTimeUnit', 'discontinuous', 'timeZone'];
         break;
       case 'time_range' :
+      case 'time_single' :
         keyMap = ['intervals', 'timeUnit', 'byTimeUnit', 'discontinuous'];
         break;
       case 'time_list' :
@@ -367,8 +395,10 @@ export class FilterUtil {
         break;
     }
     keyMap = keyMap.concat(['type', 'field', 'ref', 'dataSource']);
-    for (let key of Object.keys(filter)) {
-      (keyMap.some(item => item === key)) || (delete filter[key]);
+    for (const key of Object.keys(filter)) {
+      if (key) {
+        (keyMap.some(item => item === key)) || (delete filter[key]);
+      }
     }
 
     return filter;
@@ -382,25 +412,24 @@ export class FilterUtil {
   public static convertToServerSpecForDashboard(filter: Filter): Filter {
 
     // Time Range 필터의 타임 형식 설정
-    if (FilterUtil.isTimeRangeFilter(filter)) {
-      const timeRangeFilter = <TimeRangeFilter>filter;
+    if (FilterUtil.isTimeRangeFilter(filter) || FilterUtil.isTimeSingleFilter(filter)) {
+      // Time Single 필터
+      const timeRangeFilter = filter as TimeRangeFilter;
       if (timeRangeFilter.intervals && 0 < timeRangeFilter.intervals.length) {
         timeRangeFilter.intervals.forEach((item: string, idx: number) => {
           const arrInterval: any[] = item.split('/');
-
           if (TimeRangeFilter.EARLIEST_DATETIME !== arrInterval[0] && TimeRangeFilter.LATEST_DATETIME !== arrInterval[0]) {
             arrInterval[0] = FilterUtil.getDateTimeFormat(arrInterval[0], timeRangeFilter.timeUnit, true);
           }
           if (TimeRangeFilter.EARLIEST_DATETIME !== arrInterval[1] && TimeRangeFilter.LATEST_DATETIME !== arrInterval[1]) {
             arrInterval[1] = FilterUtil.getDateTimeFormat(arrInterval[1], timeRangeFilter.timeUnit, false);
           }
-
           timeRangeFilter.intervals[idx] = arrInterval[0] + '/' + arrInterval[1];
         });
       }
     } // end if - time_range
     else if (FilterUtil.isTimeRelativeFilter(filter)) {
-      const timeRelativeFilter: TimeRelativeFilter = <TimeRelativeFilter>filter;
+      const timeRelativeFilter: TimeRelativeFilter = filter as TimeRelativeFilter;
       if (timeRelativeFilter.clzField && timeRelativeFilter.clzField.format && TimezoneService.DISABLE_TIMEZONE_KEY === timeRelativeFilter.clzField.format.timeZone) {
         delete timeRelativeFilter.timeZone;
       } else {
@@ -417,7 +446,7 @@ export class FilterUtil {
           'minTime', 'maxTime', 'valueList', 'candidateValues', 'discontinuous', 'granularity'];
         break;
       case 'include' :
-        keyMap = ['selector', 'valueList', 'candidateValues', 'definedValues', 'sort'];
+        keyMap = ['selector', 'valueList', 'candidateValues', 'definedValues', 'sort', 'limit'];
         break;
       case 'timestamp' :
         keyMap = ['selectedTimestamps', 'timeFormat'];
@@ -432,6 +461,7 @@ export class FilterUtil {
         keyMap = ['relTimeUnit', 'tense', 'value', 'timeUnit', 'byTimeUnit', 'discontinuous', 'timeZone'];
         break;
       case 'time_range' :
+      case 'time_single' :
         keyMap = ['intervals', 'timeUnit', 'byTimeUnit', 'discontinuous'];
         break;
       case 'time_list' :
@@ -448,7 +478,7 @@ export class FilterUtil {
         break;
     }
     keyMap = keyMap.concat(['type', 'field', 'ref', 'dataSource']);
-    for (let key of Object.keys(filter)) {
+    for (const key of Object.keys(filter)) {
       (keyMap.some(item => item === key)) || (delete filter[key]);
     }
 
@@ -468,23 +498,47 @@ export class FilterUtil {
    * @returns {string}
    */
   public static getDateTimeFormat(date: (Date | string), timeUnit: TimeUnit, isStart: boolean = true): string {
-    if( date.constructor === String ) {
-      date = (<string>date).replace( '.000Z', '' );
+    if (date.constructor === String) {
+      date = (date as string).replace('.000Z', '');
     }
     switch (timeUnit) {
       case TimeUnit.SECOND:
-        return moment(date).format('YYYY-MM-DD HH:mm:ss');
+        if( date.constructor !== String || !/^[0-9]{4}-[0-9]{2}-[0-9]{2}\s[0-9]{2}-[0-9]{2}-[0-9]{2}$/.test(date) ) {
+          return moment(date).format('YYYY-MM-DD HH:mm:ss');
+        } else {
+          return ( date as string );
+        }
       case TimeUnit.MINUTE:
-        return moment(date).format('YYYY-MM-DD HH:mm');
+        if( date.constructor !== String || !/^[0-9]{4}-[0-9]{2}-[0-9]{2}\s[0-9]{2}-[0-9]{2}$/.test(date) ) {
+          return moment(date).format('YYYY-MM-DD HH:mm');
+        } else {
+          return ( date as string );
+        }
       case TimeUnit.HOUR:
-        return moment(date).format('YYYY-MM-DD HH');
+        if( date.constructor !== String || !/^[0-9]{4}-[0-9]{2}-[0-9]{2}\s[0-9]{2}$/.test(date) ) {
+          return moment(date).format('YYYY-MM-DD HH');
+        } else {
+          return ( date as string );
+        }
       case TimeUnit.DAY:
-        return moment(date).format('YYYY-MM-DD');
+        if (date.constructor !== String || !/^[0-9]{4}-[0-9]{2}-[0-9]{2}$/.test(date) ) {
+          return moment(date).format('YYYY-MM-DD');
+        } else {
+          return ( date as string );
+        }
       case TimeUnit.WEEK:
-        // return moment(date).format('YYYY-WW');
-        return (<string>date);
+        if (date.constructor !== String || !/^[0-9]{4}-[0-9]{1,2}$/.test(date) ) {
+          return moment(date).format('gggg-W');
+        } else {
+          return ( date as string );
+        }
+        // return (date as string);
       case TimeUnit.MONTH:
-        return moment(date).format('YYYY-MM');
+        if (date.constructor !== String || !/^[0-9]{4}-[0-9]{2}$/.test(date) ) {
+          return moment(date).format('YYYY-MM');
+        } else {
+          return ( date as string );
+        }
       case TimeUnit.QUARTER:
         if (date instanceof Date) {
           return moment(date).format('YYYY-MM');
@@ -502,7 +556,11 @@ export class FilterUtil {
           return strYear + '-' + strQuarter;
         }
       case TimeUnit.YEAR:
-        return moment(date).format('YYYY');
+        if (date.constructor !== String || !/^[0-9]{4}$/.test(date) ) {
+          return moment(date).format('YYYY');
+        } else {
+          return ( date as string );
+        }
       default:
         return moment(date).format('YYYY-MM-DD HH:mm:ss');
     }
@@ -577,6 +635,29 @@ export class FilterUtil {
   } // function - convertIntervalToTimeFilter
 
   /**
+   * Relative Filter 를 Interval Filter 로 변환해서 반환한다.
+   * @param {TimeFilter} relativeFilter
+   * @param {Dashboard} boardInfo
+   * @returns {TimeFilter}
+   */
+  public static convertRelativeToInterval(relativeFilter: TimeFilter, boardInfo: Dashboard):TimeFilter {
+    if (this.isTimeFilter(relativeFilter) && this.isTimeRelativeFilter(relativeFilter)) {
+      let filter: TimeFilter = _.cloneDeep(relativeFilter) as TimeFilter;
+      const relativeInterval = this.getIntervalFromRelative(filter);
+      filter.clzField = DashboardUtil.getFieldByName(boardInfo, filter.dataSource, filter.field);
+      filter = FilterUtil.getTimeRangeFilter(
+        filter.clzField, filter.timeUnit, 'general',
+        boardInfo.dataSources.find(ds => ds.engineName === filter.dataSource)
+      );
+      (filter as TimeRangeFilter).timeUnit = TimeUnit.DAY;
+      (filter as TimeRangeFilter).intervals = relativeInterval;
+      return filter;
+    } else {
+      return relativeFilter;
+    }
+  } // func - convertRelativeToInterval
+
+  /**
    * 타임 필터 여부
    * @param {Filter} filter
    * @returns {boolean}
@@ -585,7 +666,8 @@ export class FilterUtil {
     return ('time_all' === filter.type
       || 'time_list' === filter.type
       || 'time_range' === filter.type
-      || 'time_relative' === filter.type);
+      || 'time_relative' === filter.type
+      || 'time_single' === filter.type);
   } // function - isTimeFilter
 
   /**
@@ -643,6 +725,73 @@ export class FilterUtil {
   } // function - isTimeListFilter
 
   /**
+   * Date(Single) Time Filter 여부
+   * @param filter
+   * @returns {boolean}
+   */
+  public static isTimeSingleFilter(filter: Filter): boolean{
+    return filter.type === 'time_single';
+  } // function - isTimeDateFilter
+
+  /**
+   * Relative 로 부터 Interval 정보 얻음 얻는다.
+   */
+  public static getIntervalFromRelative(filter: TimeFilter):string[] {
+    const timeRelativeFilter: TimeRelativeFilter = filter as TimeRelativeFilter;
+    // 포맷 설정
+    const strFormat: string = 'YYYY-MM-DD';
+    let strManipulateKey: string = '';
+    switch (timeRelativeFilter.relTimeUnit) {
+      case TimeUnit.YEAR:
+        strManipulateKey = 'y';
+        break;
+      case TimeUnit.QUARTER:
+        strManipulateKey = 'Q';
+        break;
+      case TimeUnit.MONTH:
+        strManipulateKey = 'M';
+        break;
+      case TimeUnit.WEEK:
+        strManipulateKey = 'w';
+        break;
+      case TimeUnit.DAY:
+        strManipulateKey = 'd';
+        break;
+      case TimeUnit.HOUR:
+        strManipulateKey = 'h';
+        break;
+      case TimeUnit.MINUTE:
+        strManipulateKey = 'm';
+        break;
+      case TimeUnit.SECOND:
+        strManipulateKey = 's';
+        break;
+    }
+
+    // 날짜 설정
+    const objDate = moment();
+    let strPreview: string = '';
+    switch (timeRelativeFilter.tense) {
+      case TimeRelativeTense.PREVIOUS :
+        objDate.subtract(timeRelativeFilter.value, strManipulateKey);
+        strPreview = objDate.format(strFormat);
+        strPreview = strPreview + '/' + moment().format(strFormat);
+        break;
+      case TimeRelativeTense.NEXT :
+        objDate.add(timeRelativeFilter.value, strManipulateKey);
+        strPreview = objDate.format(strFormat);
+        strPreview = moment().format(strFormat) + '/' + strPreview;
+        break;
+      default :
+        strPreview = objDate.format(strFormat);
+        strPreview = strPreview + '/' + strPreview;
+        break;
+    }
+
+    return [strPreview];
+  } // function - getIntervalFromRelative
+
+  /**
    * All Time Filter 생성
    * @param {Field} field
    * @param {string} importanceType
@@ -671,22 +820,42 @@ export class FilterUtil {
    */
   public static getTimeRangeFilter(field: Field, timeUnit?: TimeUnit, importanceType?: string, ds?: Datasource): TimeRangeFilter {
     const timeFilter = new TimeRangeFilter(field);
-    timeFilter.timeUnit = isNullOrUndefined(timeUnit) ? TimeUnit.NONE : timeUnit;
+    timeFilter.timeUnit = CommonUtil.isNullOrUndefined(timeUnit) ? TimeUnit.NONE : timeUnit;
 
     (importanceType) && (timeFilter.ui.importanceType = importanceType);
 
-    if( !timeFilter.intervals
+    if (!timeFilter.intervals
       && ds && ds.summary
-      && ds.summary.ingestionMinTime && ds.summary.ingestionMaxTime ) {
-      ( timeFilter as TimeRangeFilter ).intervals = [
-        FilterUtil.getDateTimeFormat( ds.summary.ingestionMinTime, TimeUnit.SECOND)
+      && ds.summary.ingestionMinTime && ds.summary.ingestionMaxTime) {
+      (timeFilter as TimeRangeFilter).intervals = [
+        FilterUtil.getDateTimeFormat(ds.summary.ingestionMinTime, timeUnit)
         + '/'
-        + FilterUtil.getDateTimeFormat( ds.summary.ingestionMaxTime, TimeUnit.SECOND)
+        + FilterUtil.getDateTimeFormat(ds.summary.ingestionMaxTime, timeUnit)
       ];
     }
 
     return timeFilter;
   } // function - getTimeRangeFilter
+
+  /**
+   * TimeDateFilter 설정
+   * @param field
+   * @param timeUnit
+   * @param importanceType
+   */
+  public static getTimeDateFilter(field: Field, timeUnit?: TimeUnit, importanceType?: string): TimeDateFilter {
+    const timeFilter = new TimeDateFilter(field);
+    timeFilter.timeUnit = CommonUtil.isNullOrUndefined(timeUnit) ? TimeUnit.NONE : timeUnit;
+
+    (importanceType) && (timeFilter.ui.importanceType = importanceType);
+
+    // if(!timeFilter.intervals){
+    //   timeFilter.valueDate = this.getDateTimeFormat(moment().toISOString(), timeUnit);
+    //   timeFilter.intervals = [timeFilter.valueDate + '/' + timeFilter.valueDate];
+    // }
+
+    return timeFilter;
+  } // function - getTimeDateFilter
 
   /**
    * TimeRelativeFilter 설정
@@ -697,7 +866,7 @@ export class FilterUtil {
    */
   public static getTimeRelativeFilter(field: Field, timeUnit?: TimeUnit, importanceType?: string): TimeRelativeFilter {
     const timeFilter = new TimeRelativeFilter(field);
-    timeFilter.timeUnit = isNullOrUndefined(timeUnit) ? TimeUnit.NONE : timeUnit;
+    timeFilter.timeUnit = CommonUtil.isNullOrUndefined(timeUnit) ? TimeUnit.NONE : timeUnit;
 
     (importanceType) && (timeFilter.ui.importanceType = importanceType);
 
@@ -718,7 +887,7 @@ export class FilterUtil {
     timeFilter.timeUnit = timeUnit;
     timeFilter.discontinuous = discontinuous;
     timeFilter.valueList = [];
-    (isNullOrUndefined(byTimeUnit)) || (timeFilter.byTimeUnit = byTimeUnit);
+    (CommonUtil.isNullOrUndefined(byTimeUnit)) || (timeFilter.byTimeUnit = byTimeUnit);
 
     (importanceType) && (timeFilter.ui.importanceType = importanceType);
 
@@ -726,17 +895,17 @@ export class FilterUtil {
   } // function - getTimeListFilter
 
 
-  static setParameterFilterValue(filter: Filter, key: string, value: any): void {
+  static setParameterFilterValue(filter: Filter, _key: string, value: any): void {
     if (filter.type === 'include') {
-      const inclusionFilter: InclusionFilter = <InclusionFilter>filter;
+      const inclusionFilter: InclusionFilter = filter as InclusionFilter;
       if (Array.isArray(value)) {
         inclusionFilter.valueList = value;
       } else {
         inclusionFilter.valueList = [value];
       }
-    } else if (filter.type === "bound") {
-      const boundFilter: BoundFilter = <BoundFilter>filter;
-      const paramValues: string[] = value.split(",");
+    } else if (filter.type === 'bound') {
+      const boundFilter: BoundFilter = filter as BoundFilter;
+      const paramValues: string[] = value.split(',');
       if (paramValues.length === 2) {
         const min = Number(paramValues[0]);
         const max = Number(paramValues[1]);
@@ -747,28 +916,28 @@ export class FilterUtil {
           boundFilter.maxValue = max;
         }
       }
-    } else if (filter.type === "time_range") {
-      const timeRangeFilter: TimeRangeFilter = <TimeRangeFilter>filter;
+    } else if (filter.type === 'time_range') {
+      const timeRangeFilter: TimeRangeFilter = filter as TimeRangeFilter;
       if (Array.isArray(value)) {
         timeRangeFilter.intervals = value;
       } else {
         timeRangeFilter.intervals = [value];
       }
-    } else if (filter.type === "time_relative") {
-      const timeRelativeFilter: TimeRelativeFilter = <TimeRelativeFilter>filter;
-      const valueAttributes: string[] = value.split(",");
+    } else if (filter.type === 'time_relative') {
+      const timeRelativeFilter: TimeRelativeFilter = filter as TimeRelativeFilter;
+      const valueAttributes: string[] = value.split(',');
       valueAttributes.forEach(attr => {
-        const keyValue = attr.split(":");
-        if (keyValue[0] === "tense") {
+        const keyValue = attr.split(':');
+        if (keyValue[0] === 'tense') {
           timeRelativeFilter.tense = TimeRelativeTense[keyValue[1]];
-        } else if (keyValue[0] === "relTimeUnit") {
+        } else if (keyValue[0] === 'relTimeUnit') {
           timeRelativeFilter.relTimeUnit = TimeUnit[keyValue[1]];
         } else if (keyValue[0] === 'value') {
           timeRelativeFilter.value = +keyValue[1];
         }
       });
-    } else if (filter.type === "time_list") {
-      const timeListFilter: TimeListFilter = <TimeListFilter>filter;
+    } else if (filter.type === 'time_list') {
+      const timeListFilter: TimeListFilter = filter as TimeListFilter;
       if (Array.isArray(value)) {
         timeListFilter.valueList = value;
       } else {

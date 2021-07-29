@@ -15,12 +15,12 @@
 import {
   Component, ElementRef, EventEmitter, Injector, Input, OnInit, Output
 } from '@angular/core';
-import { AbstractComponent } from '../../../common/component/abstract.component';
-import {Datasource, FieldFormatType, FieldRole, Status} from '../../../domain/datasource/datasource';
-import { DatasourceService } from '../../service/datasource.service';
-import { MomentDatePipe } from '../../../common/pipe/moment.date.pipe';
+import { AbstractComponent } from '@common/component/abstract.component';
+import { MomentDatePipe } from '@common/pipe/moment.date.pipe';
+import { Metadata } from '@domain/meta-data-management/metadata';
+import {Datasource, FieldFormatType, FieldRole, Status} from '@domain/datasource/datasource';
 import { MetadataService } from '../../../meta-data-management/metadata/service/metadata.service';
-import { Metadata } from '../../../domain/meta-data-management/metadata';
+import { DatasourceService } from '../../service/datasource.service';
 
 @Component({
   selector: 'app-datasource-summary',
@@ -63,6 +63,10 @@ export class DatasourceSummaryComponent extends AbstractComponent implements OnI
   public hasHeader: boolean = true;
   public isShowDataPreview: boolean = false;
   public isEnabled: boolean = false;
+
+  @Input()
+  public isChangeDsMode: boolean = false;
+
 
   /*-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=
    | Constructor
@@ -157,6 +161,9 @@ export class DatasourceSummaryComponent extends AbstractComponent implements OnI
         break;
       case 'ARRAY':
         result = 'ddp-icon-type-array';
+        break;
+      case 'HASHED_MAP':
+        result = 'ddp-icon-type-etc';
         break;
       case 'CALCULATED':
         result = 'ddp-icon-type-sharp';

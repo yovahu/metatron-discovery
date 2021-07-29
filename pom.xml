@@ -20,7 +20,7 @@
     <groupId>app.metatron.discovery</groupId>
     <artifactId>metatron-discovery</artifactId>
     <packaging>pom</packaging>
-    <version>2021.2-SNAPSHOT</version>
+    <version>2021.3-SNAPSHOT</version>
 
     <modules>
         <module>discovery-frontend</module>
@@ -49,7 +49,7 @@
         <spring.data.rest.version>2.6.8.RELEASE</spring.data.rest.version>
         <spring.security.version>4.1.3.RELEASE</spring.security.version>
         <spring.security.jwt.version>1.0.8.RELEASE</spring.security.jwt.version>
-        <spring.security.oauth.version>2.0.17.RELEASE</spring.security.oauth.version>
+        <spring.security.oauth.version>2.0.18.RELEASE</spring.security.oauth.version>
         <spring.session.version>1.3.0.RELEASE</spring.session.version>
 
         <!-- WAS -->
@@ -74,7 +74,7 @@
         <junit.version>4.12</junit.version>
 
         <jackson.version>2.9.9</jackson.version>
-        <jackson.databind.version>2.9.10.4</jackson.databind.version>
+        <jackson.databind.version>2.9.10.7</jackson.databind.version>
 
         <metatron.metis.version>2.0.0-SNAPSHOT</metatron.metis.version>
 
@@ -571,7 +571,7 @@
             <dependency>
                 <groupId>commons-beanutils</groupId>
                 <artifactId>commons-beanutils</artifactId>
-                <version>1.9.3</version>
+                <version>1.9.4</version>
                 <exclusions>
                     <exclusion>
                         <artifactId>commons-logging</artifactId>
@@ -589,7 +589,7 @@
             <dependency>
                 <groupId>org.apache.httpcomponents</groupId>
                 <artifactId>httpclient</artifactId>
-                <version>4.5.2</version>
+                <version>4.5.13</version>
                 <exclusions>
                     <exclusion>
                         <artifactId>commons-logging</artifactId>
@@ -648,7 +648,7 @@
             <dependency>
                 <groupId>org.quartz-scheduler</groupId>
                 <artifactId>quartz</artifactId>
-                <version>2.3.0</version>
+                <version>2.3.2</version>
             </dependency>
 
             <dependency>
@@ -677,7 +677,7 @@
             <dependency>
                 <groupId>org.apache.poi</groupId>
                 <artifactId>poi</artifactId>
-                <version>3.16</version>
+                <version>3.17</version>
             </dependency>
 
             <!--

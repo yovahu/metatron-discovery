@@ -24,19 +24,16 @@ import {
   QueryList,
   ViewChildren,
 } from '@angular/core';
-import {AbstractPopupComponent} from '../../../../../common/component/abstract-popup.component';
+import {AbstractPopupComponent} from '@common/component/abstract-popup.component';
 import {WorkspaceService} from '../../../../../workspace/service/workspace.service';
-import {PublicType, WorkspaceAdmin} from '../../../../../domain/workspace/workspace';
+import {PublicType, WorkspaceAdmin} from '@domain/workspace/workspace';
 import * as _ from 'lodash';
-import {Page} from '../../../../../domain/common/page';
-import {forkJoin} from 'rxjs/observable/forkJoin';
-import 'rxjs/add/observable/of';
-import {of} from 'rxjs/observable/of';
-import {from} from 'rxjs/observable/from';
+import {Page} from '@domain/common/page';
 import {EventsService} from './service/events.service';
 import {WorkspaceDetailComponent} from './workspace-detail.component';
 import {WorkspaceMembersSelectBoxComponent} from './workspace-members-select-box.component';
-import {mergeMap} from 'rxjs/internal/operators/mergeMap';
+import {forkJoin, from, of} from 'rxjs';
+import {mergeMap} from 'rxjs/operators';
 
 @Component({
   selector: 'change-workspace-owner-modal',
@@ -232,9 +229,7 @@ export class ChangeWorkspaceOwnerModalComponent extends AbstractPopupComponent i
       page.sort = 'memberName,asc';
       page.page = 0;
       return new Promise((resolve, reject) => {
-        this.workspaceService.getWorkspaceUsers(workspaceId, page).
-          then(result => resolve(result['_embedded'] ? result['_embedded']['members'] : [])).
-          catch(error => reject(error));
+        this.workspaceService.getWorkspaceUsers(workspaceId, page).then(result => resolve(result['_embedded'] ? result['_embedded']['members'] : [])).catch(error => reject(error));
       });
     };
 
@@ -242,7 +237,7 @@ export class ChangeWorkspaceOwnerModalComponent extends AbstractPopupComponent i
       mergeMap(project => forkJoin(project.map(id => from(getWorkspaceUsers(id))))),
     ).subscribe(
       members => {
-        this.members = members;
+        this.members = members as any[];
         this._selfShow();
         this.loadingHide();
       },
@@ -291,17 +286,13 @@ export class ChangeWorkspaceOwnerModalComponent extends AbstractPopupComponent i
 
   private transferWorkspaceOwner(workspaceId: string, username: string) {
     return new Promise((resolve, reject) => {
-      this.workspaceService.transferWorkspaceOwner(workspaceId, username).
-        then(result => resolve(result)).
-        catch(error => reject(error));
+      this.workspaceService.transferWorkspaceOwner(workspaceId, username).then(result => resolve(result)).catch(error => reject(error));
     });
   }
 
   private deleteWorkspace(workspaceId: string) {
     return new Promise(((resolve, reject) => {
-      this.workspaceService.deleteWorkspace(workspaceId).
-        then(result => resolve(result)).
-        catch(error => reject(error));
+      this.workspaceService.deleteWorkspace(workspaceId).then(result => resolve(result)).catch(error => reject(error));
     }))
   }
 

@@ -12,33 +12,45 @@
  * limitations under the License.
  */
 
-import {Component, ElementRef, HostListener, Injector, OnDestroy, OnInit, ViewChild} from '@angular/core';
-import { Dashboard } from '../../domain/dashboard/dashboard';
-import { AbstractComponent } from '../../common/component/abstract.component';
-import { ActivatedRoute } from '@angular/router';
-import { CookieConstant } from '../../common/constant/cookie.constant';
-import { DashboardService } from '../../dashboard/service/dashboard.service';
-import {Filter} from "../../domain/workbook/configurations/filter/filter";
-import {FilterWidgetConfiguration} from "../../domain/dashboard/widget/filter-widget";
-import {FilterUtil} from "../../dashboard/util/filter.util";
-import * as $ from "jquery";
-import { DashboardComponent } from '../../dashboard/dashboard.component';
+import * as $ from 'jquery';
+import {
+  AfterViewInit,
+  Component,
+  ElementRef,
+  Injector,
+  OnDestroy,
+  OnInit,
+  ViewChild
+} from '@angular/core';
+import {ActivatedRoute} from '@angular/router';
+import {AbstractComponent} from '@common/component/abstract.component';
+import {CookieConstant} from '@common/constant/cookie.constant';
+import {Filter} from '@domain/workbook/configurations/filter/filter';
+import {Dashboard} from '@domain/dashboard/dashboard';
+import {FilterWidgetConfiguration} from '@domain/dashboard/widget/filter-widget';
+import {FilterUtil} from '../../dashboard/util/filter.util';
+import {DashboardService} from '../../dashboard/service/dashboard.service';
+import {DashboardComponent} from '../../dashboard/dashboard.component';
+import {map} from 'rxjs/operators';
+import {combineLatest} from 'rxjs';
 
 @Component({
   selector: 'app-embedded-dashboard',
   templateUrl: './embedded-dashboard.component.html'
 })
-export class EmbeddedDashboardComponent extends AbstractComponent implements OnInit, OnDestroy {
+export class EmbeddedDashboardComponent extends AbstractComponent implements OnInit, AfterViewInit, OnDestroy {
 
   /*-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=
   | Private Variables
   |-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=*/
 
   // 대시보드 컴포넌트
-  @ViewChild(DashboardComponent)
+  @ViewChild(DashboardComponent, {static: true})
   private _boardComp: DashboardComponent;
 
-  private _boardId:string;
+  private _boardId: string;
+
+  private _preFilters: { [key: string]: string } = {};
   /*-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=
   | Protected Variables
   |-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=*/
@@ -48,6 +60,11 @@ export class EmbeddedDashboardComponent extends AbstractComponent implements OnI
   |-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=*/
   // 선택된 대시보드
   public dashboard: Dashboard;
+
+  // 임베디드 대시보드 상단바 유무
+  public isShowSelectionFilter: boolean = true;
+  // 임베디드 자동 업데이트 유무
+  public isShowAutoOn: boolean = true;
 
   /*-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=
   | Constructor
@@ -75,15 +92,56 @@ export class EmbeddedDashboardComponent extends AbstractComponent implements OnI
 
     window.history.pushState(null, null, window.location.href);
 
-    this.activatedRoute.params.subscribe((params) => {
+    combineLatest([this.activatedRoute.params, this.activatedRoute.queryParams, this.activatedRoute.fragment,])
+      .pipe(
+        map( result => ({queryParam: result[0], queryParams:result[1], fragment:result[2]}))
+      ).subscribe(result => {
+      this._preFilters = {};
+      const params = result.queryParam;
+      let fragment = result.fragment;
+      let queryParams = {};
+      if(fragment && fragment.includes('?')){
+        // fragment에서 dashboardId 와 queryParams 추출
+        const paramsArr = fragment.slice(fragment.indexOf('?')+1).split('&');
+        paramsArr.forEach(param => {
+          const paramArr = param.split('=');
+          queryParams[paramArr[0]] = paramArr[1];
+        });
+        fragment = fragment.slice(0,fragment.indexOf('?')); // dashboardId
+      }else{
+        queryParams = result.queryParams;
+      }
+
+      // 사전 필터 목록 등록
+      Object.keys(queryParams).forEach(key => {
+        if( 'selectionFilter' !== key && 'autoOn' !== key && 'loginToken' !== key && 'loginType' !== key && 'refreshToken' !== key && 'dashboardId' !== key ) {
+          this._preFilters[key] = queryParams[key];
+        }
+      });
+
+      if(!this.isNullOrUndefined(queryParams['selectionFilter'])){
+        this.isShowSelectionFilter = (queryParams['selectionFilter'] == 'true');
+      }
+      if(!this.isNullOrUndefined(queryParams['autoOn'])){
+        this.isShowAutoOn = (queryParams['autoOn'] == 'true');
+      }
+      // console.log('SelectionFilter: ' + this.isShowSelectionFilter);
+      // console.log('ShowAutonOn: ' + this.isShowAutoOn);
+
       // dashboard 아이디를 넘긴경우에만 실행
-      // 로그인 정보 생성
+      // 로그인 정보 생성s
       (params['loginToken']) && (this.cookieService.set(CookieConstant.KEY.LOGIN_TOKEN, params['loginToken'], 0, '/'));
       (params['loginType']) && (this.cookieService.set(CookieConstant.KEY.LOGIN_TOKEN_TYPE, params['loginType'], 0, '/'));
       (params['refreshToken']) && (this.cookieService.set(CookieConstant.KEY.REFRESH_LOGIN_TOKEN, params['refreshToken'], 0, '/'));
+
       if (params['dashboardId']) {
+        // console.log( '>>>>>>>> dashboardId', params['dashboardId'] );
         this._boardId = params['dashboardId'];
         this.getDashboardDetail(params['dashboardId']);
+      } else if (fragment) {
+        // console.log( '>>>>>>>> fragment', params['fragment'] );
+        this._boardId = fragment;
+        this.getDashboardDetail(fragment);
       }
     });
 
@@ -101,10 +159,10 @@ export class EmbeddedDashboardComponent extends AbstractComponent implements OnI
     super.ngOnDestroy();
   }
 
-  @HostListener('window:popstate', ['$event'])
-  public onPopstate() {
-    window.history.pushState(null, null, window.location.href);
-  }
+  // @HostListener('window:popstate')
+  // public onPopstate() {
+  //   window.history.pushState(null, null, window.location.href);
+  // }
 
   /*-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=
   | Protected Method
@@ -140,7 +198,7 @@ export class EmbeddedDashboardComponent extends AbstractComponent implements OnI
       $('body').removeClass('body-hidden');
       this._boardComp.hideBoardLoading();
     } else if ('RELOAD_BOARD' === event.name) {
-      this.getDashboardDetail( this._boardId );
+      this.getDashboardDetail(this._boardId);
     }
   } // function - onDashboardEvent
 
@@ -153,23 +211,25 @@ export class EmbeddedDashboardComponent extends AbstractComponent implements OnI
    * @param dashboard
    */
   private _setParameterFilterValues(dashboard) {
-    this.activatedRoute.queryParams.subscribe(params => {
-      Object.keys(params).forEach(key => {
-        dashboard.configuration.filters.forEach((eachFilter: Filter) => {
-          if (eachFilter.field == key) {
-            FilterUtil.setParameterFilterValue(eachFilter, key, params[key]);
+    Object.keys(this._preFilters).forEach(key => {
+      dashboard.configuration.filters.forEach((eachFilter: Filter) => {
+        if (eachFilter.field && eachFilter.field.toLowerCase() === key.toLowerCase()) {
+          FilterUtil.setParameterFilterValue(eachFilter, key, this._preFilters[key]);
+        }
+      });
+      dashboard.widgets.forEach((widget) => {
+        if (widget.type === 'filter') {
+          const widgetConf: FilterWidgetConfiguration = widget.configuration as FilterWidgetConfiguration;
+          if(
+            ( widgetConf.filter.field && widgetConf.filter.field.toLowerCase() === key.toLowerCase() )
+            || widget.name.toLowerCase() === key.toLowerCase()
+          ) {
+            FilterUtil.setParameterFilterValue(widgetConf.filter, key, this._preFilters[key]);
           }
-        });
-        dashboard.widgets.forEach((widget) => {
-          if (widget.type === 'filter' && widget.name == key) {
-            const widgetConf: FilterWidgetConfiguration  = <FilterWidgetConfiguration>widget.configuration;
-            FilterUtil.setParameterFilterValue(widgetConf.filter, key, params[key]);
-          }
-        })
+        }
       })
-    });
+    })
   }
-
 
 
 }

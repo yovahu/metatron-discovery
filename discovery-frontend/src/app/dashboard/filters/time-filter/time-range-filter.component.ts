@@ -14,27 +14,37 @@
 
 import * as _ from 'lodash';
 import {
+  AfterViewInit,
   Component,
   ElementRef,
+  EventEmitter,
   Injector,
-  OnInit,
-  OnDestroy,
   Input,
+  OnChanges,
+  OnDestroy,
+  OnInit,
+  Output,
   SimpleChange,
   SimpleChanges,
-  EventEmitter, Output
 } from '@angular/core';
-import {AbstractFilterPopupComponent} from '../abstract-filter-popup.component';
-import {Dashboard} from '../../../domain/dashboard/dashboard';
+import {EventBroadcaster} from '@common/event/event.broadcaster';
+import {Dashboard} from '@domain/dashboard/dashboard';
+import {TimeRangeFilter} from '@domain/workbook/configurations/filter/time-range-filter';
 import {DatasourceService} from '../../../datasource/service/datasource.service';
-import {TimeRangeFilter} from '../../../domain/workbook/configurations/filter/time-range-filter';
+import {FilterUtil} from '../../util/filter.util';
 import {TimeRange, TimeRangeData} from '../component/time-range.component';
+import {AbstractFilterPopupComponent} from '../abstract-filter-popup.component';
 
 @Component({
   selector: 'app-time-range-filter',
-  templateUrl: './time-range-filter.component.html'
+  templateUrl: './time-range-filter.component.html',
+  styles: ['.sys-btn-ok { width: 23px; height: 12px;border-radius: 2px;border: solid 1px #4e5368;padding: 8px 10px; margin-left: 10px;position: relative;display: inline-block; }',
+    '.sys-btn-ok.sys-btn-large {width: 40px; height: 25px; border-radius: 2px; border: solid 1px #4e5368; padding: 20px 10px;\n' +
+    ' margin-left: 10px; position: absolute; left: 190px; top: 0; text-align: center; align-items: center; display: flex;\n' +
+    ' vertical-align: middle; justify-content: center;}'
+  ]
 })
-export class TimeRangeFilterComponent extends AbstractFilterPopupComponent implements OnInit, OnDestroy {
+export class TimeRangeFilterComponent extends AbstractFilterPopupComponent implements OnInit, OnChanges, AfterViewInit, OnDestroy {
 
   /*-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=
   | Private Variables
@@ -48,6 +58,7 @@ export class TimeRangeFilterComponent extends AbstractFilterPopupComponent imple
   /*-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=
   | Public Variables
   |-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=*/
+  public isVertical: boolean = false;
 
   // UI 상 임시값 정의
   public lastIntervals = '';
@@ -67,10 +78,10 @@ export class TimeRangeFilterComponent extends AbstractFilterPopupComponent imple
   public dashboard: Dashboard;            // 대시보드
 
   @Input('mode')
-  public mode: string = 'CHANGE';          // 화면 모드
+  public mode: 'CHANGE' | 'WIDGET' | 'PANEL' = 'CHANGE';          // 화면 모드
 
   // 필터 변경 이벤트
-  @Output('change')
+  @Output()
   public changeEvent: EventEmitter<TimeRangeFilter> = new EventEmitter();
 
   /*-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=
@@ -79,6 +90,7 @@ export class TimeRangeFilterComponent extends AbstractFilterPopupComponent imple
 
   // 생성자
   constructor(private datasourceService: DatasourceService,
+              protected broadCaster: EventBroadcaster,
               protected elementRef: ElementRef,
               protected injector: Injector) {
     super(elementRef, injector);
@@ -107,14 +119,26 @@ export class TimeRangeFilterComponent extends AbstractFilterPopupComponent imple
       if (this.isLoaded && currFilter && (
         !prevFilter || prevFilter.field !== currFilter.field ||
         0 < _.difference(prevFilter.intervals, currFilter.intervals).length)) {
-        this.setData(filterChanges.currentValue, !filterChanges.firstChange);
+        // this.setData(filterChanges.currentValue, !filterChanges.firstChange)
+        // ;
+        this.setData(filterChanges.currentValue);
       }
     }
   } // function - ngOnChanges
 
   public ngAfterViewInit() {
     super.ngAfterViewInit();
-    this.setData(this.inputFilter, true);
+    this.setData(this.inputFilter);
+    setTimeout(() => {
+      this._checkVerticalMode();
+    }, 150 );
+    this.subscriptions.push(
+      this.broadCaster.on<any>('RESIZE_WIDGET').subscribe(() => {
+        if ('WIDGET' === this.mode) {
+          this._checkVerticalMode();
+        }
+      })
+    );
   }
 
   /**
@@ -133,7 +157,7 @@ export class TimeRangeFilterComponent extends AbstractFilterPopupComponent imple
    * @param {boolean} isBroadcast
    */
   public setData(filter: TimeRangeFilter, isBroadcast: boolean = false) {
-    if( !this._isRunningCandidate ) {
+    if (!this._isRunningCandidate) {
       this._isRunningCandidate = true;
       this.loadingShow();
       const cloneFilter: TimeRangeFilter = _.cloneDeep(filter);
@@ -252,19 +276,22 @@ export class TimeRangeFilterComponent extends AbstractFilterPopupComponent imple
     if (this.isLatestTime) return;
 
     // 날짜 추가
-    const item: TimeRange = new TimeRange(this.rangeBoundary.minTime, this.rangeBoundary.maxTime);
+    const item: TimeRange = new TimeRange(
+      FilterUtil.getDateTimeFormat(this.rangeBoundary.minTime, filter.timeUnit),
+      FilterUtil.getDateTimeFormat(this.rangeBoundary.maxTime, filter.timeUnit)
+    );
+
     this.timeRangeList.push(item);
     filter.intervals.push(item.toInterval());
-
     // 변경사항 전파
     this._broadcastChange();
   } // function - addIntervalRange
 
   /**
    * 기간셋을 삭제할 경우
-   * @param {TimeRangeFilter} filter
+   * @param {TimeRangeFilter} _filter
    */
-  public deleteIntervalRange(filter: TimeRangeFilter) {
+  public deleteIntervalRange(_filter: TimeRangeFilter) {
     (this.timeRangeList.length > 1) && (this.timeRangeList.pop());
     this.isLatestTime = false;
 
@@ -298,13 +325,22 @@ export class TimeRangeFilterComponent extends AbstractFilterPopupComponent imple
   | Private Method
   |-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=*/
   /**
+   * 가로모드 여부 확인
+   * @private
+   */
+  private _checkVerticalMode(): void {
+    this.isVertical = (390 > this.$element.find('.ddp-dateinfo-view').width());
+    this.safelyDetectChanges();
+  } // func - _checkVerticalMode
+
+  /**
    * 변경사항 전파
    * @private
    */
   private _broadcastChange() {
     const filterData: TimeRangeFilter = this.getData();
     // 결과 값이 다를 경우만 이벤트 전달하여 차트 갱신
-    if (this.lastIntervals != filterData.intervals.join('')) {
+    if (this.lastIntervals !== filterData.intervals.join('')) {
       this.lastIntervals = filterData.intervals.join('');
       this.changeEvent.emit(filterData);
     }

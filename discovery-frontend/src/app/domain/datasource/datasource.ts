@@ -22,13 +22,13 @@ import {
   CreateSourceCompleteData,
   CreateSourceConfigureData,
   KafkaData
-} from "../../data-storage/service/data-source-create.service";
-import {PrDataSnapshot} from "../data-preparation/pr-snapshot";
-import {isNullOrUndefined} from "util";
-import {TimezoneService} from "../../data-storage/service/timezone.service";
-import {AggregationType} from "../workbook/configurations/field/measure-field";
-import {Type} from "../../shared/datasource-metadata/domain/type";
-import {StringUtil} from "../../common/util/string.util";
+} from '../../data-storage/service/data-source-create.service';
+import {PrDataSnapshot} from '../data-preparation/pr-snapshot';
+import {TimezoneService} from '../../data-storage/service/timezone.service';
+import {AggregationType} from '../workbook/configurations/field/measure-field';
+import {Type} from '../../shared/datasource-metadata/domain/type';
+import {StringUtil} from '@common/util/string.util';
+import {CommonUtil} from '@common/util/common.util';
 
 export class Datasource extends AbstractHistoryEntity {
   id: string;             // ID
@@ -222,23 +222,6 @@ export class Field {
   // for Datasource detail
   op?: 'replace';
 
-  removeUIproperties?() {
-    delete this.isShowTypeList;
-    delete this.isValidType;
-    delete this.useFilter;
-    delete this.useChartFilter;
-    delete this.useChart;
-  }
-
-  removeIngestionRule?() {
-    delete this.ingestionRule;
-  }
-
-  // TODO 추후 Type.Logical으로 변경시 제거 필요
-  setLogicalType?(type) {
-    this.logicalType = type;
-  }
-
   public static removeNameValidProperty(field: Field) {
     delete field.isInvalidName;
     delete field.invalidNameMessage;
@@ -327,16 +310,16 @@ export class Field {
 
 
   public static isEmptyFormat(field): boolean {
-    return isNullOrUndefined(field.format);
+    return CommonUtil.isNullOrUndefined(field.format);
   }
 
   public static isEmptyIngestionRule(field): boolean {
-    return isNullOrUndefined(field.ingestionRule);
+    return CommonUtil.isNullOrUndefined(field.ingestionRule);
   }
 
   public static getSlicedColumnName?(field: Field): string {
     if (field.name.length > 50) {
-      return field.name.slice(0,50);
+      return field.name.slice(0, 50);
     } else {
       return field.name;
     }
@@ -366,7 +349,9 @@ export class Field {
       case LogicalType.GEO_POLYGON:
         return 'ddp-icon-type-polygon';
       case LogicalType.ARRAY:
-        return 'ddp-icon-type-array'
+        return 'ddp-icon-type-array';
+      case LogicalType.HASHED_MAP:
+        return 'ddp-icon-type-etc';
       default:
         return '';
     }
@@ -378,7 +363,6 @@ export class Field {
    * @return {string}
    */
   public static getDimensionTypeIconClass(field: Field): string {
-    //debugger
     const logicalType: string = (field.logicalType) ? field.logicalType.toString() : '';
     if ('STRING' === logicalType || 'user_expr' === field.type) {
       return 'ddp-icon-dimension-ab';
@@ -396,6 +380,8 @@ export class Field {
       return 'ddp-icon-dimension-tf';
     } else if ('ARRAY' === logicalType) {
       return 'ddp-icon-dimension-array';
+    } else if ('HASHED_MAP' === logicalType) {
+      return 'ddp-icon-dimension-ab';
     } else if ('GEO_POINT' === logicalType) {
       return 'ddp-icon-map-view ddp-icon-dimension-point';
     } else if ('GEO_LINE' === logicalType) {
@@ -411,7 +397,7 @@ export class Field {
    * @return {string}
    */
   public static getMeasureTypeIconClass(field: Field): string {
-    //debugger
+    // debugger
     const logicalType: string = (field.logicalType) ? field.logicalType.toString() : '';
     if ('STRING' === logicalType) {
       return 'ddp-icon-measure-ab';
@@ -427,6 +413,8 @@ export class Field {
       return 'ddp-icon-measure-tf';
     } else if ('ARRAY' === logicalType) {
       return 'ddp-icon-measure-array';
+    } else if ('HASHED_MAP' === logicalType) {
+      return 'ddp-icon-measure-ab';
     } else if ('GEO_POINT' === logicalType) {
       return 'ddp-icon-map-view ddp-icon-measure-point';
     } else if ('GEO_LINE' === logicalType) {
@@ -435,6 +423,23 @@ export class Field {
       return 'ddp-icon-map-view ddp-icon-measure-polygon';
     }
   } // function - getMeasureTypeIconClass
+
+  removeUIproperties?() {
+    delete this.isShowTypeList;
+    delete this.isValidType;
+    delete this.useFilter;
+    delete this.useChartFilter;
+    delete this.useChart;
+  }
+
+  removeIngestionRule?() {
+    delete this.ingestionRule;
+  }
+
+  // TODO 추후 Type.Logical으로 변경시 제거 필요
+  setLogicalType?(type) {
+    this.logicalType = type;
+  }
 }
 
 // 데이터소스 생성시 사용하는 정보
@@ -548,86 +553,87 @@ export class IngestionHistory extends AbstractHistoryEntity {
 
 // job 상태
 export enum IngestionStatus {
-  SUCCESS = <any>'SUCCESS',
-  FAILED = <any>'FAILED',
-  RUNNING = <any>'RUNNING',
-  PASS = <any>'PASS'
+  SUCCESS = 'SUCCESS',
+  FAILED = 'FAILED',
+  RUNNING = 'RUNNING',
+  PASS = 'PASS'
 }
 
 // dsType
 export enum DataSourceType {
-  MASTER = <any>'MASTER',
-  JOIN = <any>'JOIN',
-  VOLATILITY = <any>'VOLATILITY'
+  MASTER = 'MASTER',
+  JOIN = 'JOIN',
+  VOLATILITY = 'VOLATILITY'
 }
 
 // connType
 export enum ConnectionType {
-  ENGINE = <any>'ENGINE',
-  LINK = <any>'LINK'
+  ENGINE = 'ENGINE',
+  LINK = 'LINK'
 }
 
 // srcType
 export enum SourceType {
-  FILE = <any>'FILE',
-  HDFS = <any>'HDFS',
-  HIVE = <any>'HIVE',
-  JDBC = <any>'JDBC',
-  REALTIME = <any>'REALTIME',
-  IMPORT = <any>'IMPORT',
-  SNAPSHOT = <any>'SNAPSHOT',
-  NONE = <any>'NONE',
-  ENGINE = <any>'ENGINE',
-  STAGEDB = <any>'STAGEDB'
+  FILE = 'FILE',
+  HDFS = 'HDFS',
+  HIVE = 'HIVE',
+  JDBC = 'JDBC',
+  REALTIME = 'REALTIME',
+  IMPORT = 'IMPORT',
+  SNAPSHOT = 'SNAPSHOT',
+  NONE = 'NONE',
+  ENGINE = 'ENGINE',
+  STAGEDB = 'STAGEDB'
 }
 
 export enum Status {
-  ENABLED = <any>'ENABLED',
-  PREPARING = <any>'PREPARING',
-  FAILED = <any>'FAILED',
-  BAD = <any>'BAD',
-  DISABLED = <any>'DISABLED'
+  ENABLED = 'ENABLED',
+  PREPARING = 'PREPARING',
+  FAILED = 'FAILED',
+  BAD = 'BAD',
+  DISABLED = 'DISABLED'
 }
 
 export enum LogicalType {
-  TEXT = <any>'STRING',
-  STRING = <any>'STRING',
-  INTEGER = <any>'INTEGER',
-  FLOAT = <any>'DOUBLE',
-  DOUBLE = <any>'DOUBLE',
-  TIMESTAMP = <any>'TIMESTAMP',
-  BOOLEAN = <any>'BOOLEAN',
-  MAP = <any>'STRUCT',
-  STRUCT = <any>'STRUCT',
-  ARRAY = <any>'ARRAY',
-  LNT = <any>'LNT',
-  LNG = <any>'LNG',
-  POSTAL_CODE = <any>'POSTAL_CODE',
-  PHONE_NUMBER = <any>'PHONE_NUMBER',
-  ETC = <any>'ETC',
-  GEO_POINT = <any>'GEO_POINT',
-  GEO_LINE = <any>'GEO_LINE',
-  GEO_POLYGON = <any>'GEO_POLYGON',
-  USER_DEFINED = <any>'user_defined'
+  TEXT = 'STRING',
+  STRING = 'STRING',
+  INTEGER = 'INTEGER',
+  FLOAT = 'DOUBLE',
+  DOUBLE = 'DOUBLE',
+  TIMESTAMP = 'TIMESTAMP',
+  BOOLEAN = 'BOOLEAN',
+  MAP = 'STRUCT',
+  STRUCT = 'STRUCT',
+  ARRAY = 'ARRAY',
+  LNT = 'LNT',
+  LNG = 'LNG',
+  POSTAL_CODE = 'POSTAL_CODE',
+  PHONE_NUMBER = 'PHONE_NUMBER',
+  ETC = 'ETC',
+  GEO_POINT = 'GEO_POINT',
+  GEO_LINE = 'GEO_LINE',
+  GEO_POLYGON = 'GEO_POLYGON',
+  USER_DEFINED = 'user_defined',
+  HASHED_MAP = 'HASHED_MAP'
 }
 
 export enum FieldRole {
-  DIMENSION = <any>'DIMENSION',
-  MEASURE = <any>'MEASURE',
-  TIMESTAMP = <any>'TIMESTAMP'
+  DIMENSION = 'DIMENSION',
+  MEASURE = 'MEASURE',
+  TIMESTAMP = 'TIMESTAMP'
 }
 
 /**
  * 필드가 올려진 선반 타입
  */
 export enum FieldPivot {
-  ROWS = <any>'ROWS',
-  COLUMNS = <any>'COLUMNS',
-  AGGREGATIONS = <any>'AGGREGATIONS',
+  ROWS = 'ROWS',
+  COLUMNS = 'COLUMNS',
+  AGGREGATIONS = 'AGGREGATIONS',
   // temp, for map chart
-  MAP_LAYER0 = <any>'MAP_LAYER0',
-  MAP_LAYER1 = <any>'MAP_LAYER1',
-  MAP_LAYER2 = <any>'MAP_LAYER2'
+  MAP_LAYER0 = 'MAP_LAYER0',
+  MAP_LAYER1 = 'MAP_LAYER1',
+  MAP_LAYER2 = 'MAP_LAYER2'
 }
 
 /**
@@ -651,19 +657,26 @@ export class FieldNameAlias extends FieldAlias {
  * Datasource Field Value Alias
  */
 export class FieldValueAlias extends FieldAlias {
-  valueAlias: Object;
+  valueAlias: object;
 } // Class - FieldValueAlias
 
 /**
  * Temporary Datasource Status
  */
 export enum TempDsStatus {
-  ENABLE = <any>'ENABLE',
-  PREPARING = <any>'PREPARING',
-  DISABLE = <any>'DISABLE'
+  ENABLE = 'ENABLE',
+  PREPARING = 'PREPARING',
+  DISABLE = 'DISABLE'
 }
 
 export class FieldFormat {
+
+  constructor() {
+    this.type = FieldFormatType.DATE_TIME;
+    // TODO 타임스탬프 개선시 제거
+    this.unit = FieldFormatUnit.MILLISECOND;
+  }
+
   // default FieldFormatType.DATE_TIME
   type: FieldFormatType;
   unit?: FieldFormatUnit;  // ONLY USE UNIX
@@ -677,6 +690,31 @@ export class FieldFormat {
   isValidFormat?: boolean;
   formatValidMessage?: string;
   isShowTimestampValidPopup?: boolean;
+
+  public static of(fieldFormat: FieldFormat) {
+    const resultFieldFormat = new FieldFormat();
+    resultFieldFormat.type = fieldFormat.type;
+    // if not undefined properties
+    if (!CommonUtil.isNullOrUndefined(fieldFormat.unit)) {
+      resultFieldFormat.unit = fieldFormat.unit;
+    }
+    if (!CommonUtil.isNullOrUndefined(fieldFormat.timeZone)) {
+      resultFieldFormat.timeZone = fieldFormat.timeZone;
+    }
+    if (!CommonUtil.isNullOrUndefined(fieldFormat.format)) {
+      resultFieldFormat.format = fieldFormat.format;
+    }
+    if (!CommonUtil.isNullOrUndefined(fieldFormat.locale)) {
+      resultFieldFormat.locale = fieldFormat.locale;
+    }
+    if (!CommonUtil.isNullOrUndefined(fieldFormat.originalSrsName)) {
+      resultFieldFormat.originalSrsName = fieldFormat.originalSrsName;
+    }
+    if (!CommonUtil.isNullOrUndefined(fieldFormat.isValidFormat)) {
+      resultFieldFormat.isValidFormat = fieldFormat.isValidFormat;
+    }
+    return resultFieldFormat;
+  }
 
   formatInitialize() {
     this.format = 'yyyy-MM-dd';
@@ -718,41 +756,10 @@ export class FieldFormat {
   }
 
   isEmptyFormat() {
-    return isNullOrUndefined(this.format);
+    return CommonUtil.isNullOrUndefined(this.format);
   }
 
-  constructor() {
-    this.type = FieldFormatType.DATE_TIME;
-    // TODO 타임스탬프 개선시 제거
-    this.unit = FieldFormatUnit.MILLISECOND;
-  }
-
-  public static of(fieldFormat: FieldFormat) {
-    let resultFieldFormat = new FieldFormat();
-    resultFieldFormat.type = fieldFormat.type;
-    // if not undefined properties
-    if (!isNullOrUndefined(fieldFormat.unit)) {
-      resultFieldFormat.unit = fieldFormat.unit;
-    }
-    if (!isNullOrUndefined(fieldFormat.timeZone)) {
-      resultFieldFormat.timeZone = fieldFormat.timeZone;
-    }
-    if (!isNullOrUndefined(fieldFormat.format)) {
-      resultFieldFormat.format = fieldFormat.format;
-    }
-    if (!isNullOrUndefined(fieldFormat.locale)) {
-      resultFieldFormat.locale = fieldFormat.locale;
-    }
-    if (!isNullOrUndefined(fieldFormat.originalSrsName)) {
-      resultFieldFormat.originalSrsName = fieldFormat.originalSrsName;
-    }
-    if (!isNullOrUndefined(fieldFormat.isValidFormat)) {
-      resultFieldFormat.isValidFormat = fieldFormat.isValidFormat;
-    }
-    return resultFieldFormat;
-  }
-
-  public changeType(format: string): void {
+  public changeType(_format: string): void {
     if (this.type === FieldFormatType.DATE_TIME) {
       this.removeDateTypeProperties();
       this.disableTimezone();
@@ -772,13 +779,13 @@ export class FieldFormat {
 
 export enum FieldFormatType {
   // TIMESTAMP
-  DATE_TIME = <any>'time_format',
-  UNIX_TIME = <any>'time_unix',
-  TEMPORARY_TIME = <any>'time_temporary',
+  DATE_TIME = 'time_format',
+  UNIX_TIME = 'time_unix',
+  TEMPORARY_TIME = 'time_temporary',
   // GEO type
-  GEO_POINT = <any>'geo_point',
-  GEO_LINE = <any>'geo_line',
-  GEO_POLYGON = <any>'geo_polygon',
+  GEO_POINT = 'geo_point',
+  GEO_LINE = 'geo_line',
+  GEO_POLYGON = 'geo_polygon',
 }
 
 export enum FieldFormatUnit {

@@ -12,13 +12,13 @@
  * limitations under the License.
  */
 
-import { NgModule } from '@angular/core';
-import { FilterSelectComponent } from './filters/component/filter-select/filter-select.component';
-import { CommonModule } from '../common/common.module';
-import { InclusionFilterPanelComponent } from './filters/inclusion-filter/inclusion-filter-panel.component';
-import { CustomFieldComponent } from './component/custom-field/custom-field.component';
-import { BoundFilterPanelComponent } from './filters/bound-filter/bound-filter-panel.component';
 import { InfiniteScrollModule } from 'ngx-infinite-scroll';
+import { NgModule } from '@angular/core';
+import { CommonModule } from '@common/common.module';
+import { CustomFieldComponent } from './component/custom-field/custom-field.component';
+import { FilterSelectComponent } from './filters/component/filter-select/filter-select.component';
+import { InclusionFilterPanelComponent } from './filters/inclusion-filter/inclusion-filter-panel.component';
+import { BoundFilterPanelComponent } from './filters/bound-filter/bound-filter-panel.component';
 import { EssentialFilterComponent } from './filters/essential-filter/essential-filter.component';
 import { ConfigureFiltersComponent } from './filters/configure-filters.component';
 import { ConfigureFiltersSelectComponent } from './filters/configure-filters-select.component';
@@ -31,8 +31,10 @@ import { TimeRelativeFilterComponent } from './filters/time-filter/time-relative
 import { TimeListFilterComponent } from './filters/time-filter/time-list-filter.component';
 import { ConfigureFiltersTimeComponent } from './filters/time-filter/configure-filters-time.component';
 import { TimeFilterPanelComponent } from './filters/time-filter/time-filter-panel.component';
+import { TimeDateFilterComponent } from './filters/time-filter/time-date-filter.component';
 import { TimeUnitSelectComponent } from './filters/component/timeUnit-select.component';
 import { TimeRangeComponent } from './filters/component/time-range.component';
+import {TimeDateComponent} from './filters/component/time-date.component';
 
 @NgModule({
   imports: [
@@ -57,7 +59,9 @@ import { TimeRangeComponent } from './filters/component/time-range.component';
     ConfigureFiltersTimeComponent,
     TimeRangeFilterComponent,
     TimeRelativeFilterComponent,
-    TimeListFilterComponent
+    TimeListFilterComponent,
+    TimeDateFilterComponent,
+    TimeDateComponent
   ],
   exports: [
     FilterSelectComponent,
@@ -77,7 +81,9 @@ import { TimeRangeComponent } from './filters/component/time-range.component';
     ConfigureFiltersTimeComponent,
     TimeRangeFilterComponent,
     TimeRelativeFilterComponent,
-    TimeListFilterComponent
+    TimeListFilterComponent,
+    TimeDateFilterComponent,
+    TimeDateComponent
   ]
 })
 export class DashboardShareModule { }

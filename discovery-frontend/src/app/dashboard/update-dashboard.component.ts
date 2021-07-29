@@ -13,10 +13,14 @@
  */
 
 import * as _ from 'lodash';
+import * as $ from 'jquery';
+import {isNullOrUndefined, isObject} from 'util';
+
 import {
+  AfterViewInit,
   ApplicationRef,
-  ComponentFactoryResolver,
   Component,
+  ComponentFactoryResolver,
   ElementRef,
   EventEmitter,
   Injector,
@@ -24,57 +28,57 @@ import {
   OnDestroy,
   OnInit,
   Output,
-  ViewChild,
-  SimpleChanges,
-  SimpleChange
+  ViewChild
 } from '@angular/core';
-import {Workbook} from '../domain/workbook/workbook';
+import {ActivatedRoute} from '@angular/router';
+
+import {Alert} from '@common/util/alert.util';
+import {CommonUtil} from '@common/util/common.util';
+import {PopupService} from '@common/service/popup.service';
+import {ImageService} from '@common/service/image.service';
+import {Modal} from '@common/domain/modal';
+import {SubscribeArg} from '@common/domain/subscribe-arg';
+import {EventBroadcaster} from '@common/event/event.broadcaster';
+import {ChartType} from '@common/component/chart/option/define/common';
+import {UIMapOption} from '@common/component/chart/option/ui-option/map/ui-map-chart';
+
+import {Workbook} from '@domain/workbook/workbook';
 import {
   BoardConfiguration,
   BoardDataSource,
   Dashboard,
+  DashboardWidgetRelation,
   LayoutMode
-} from '../domain/dashboard/dashboard';
-import {ConnectionType, Datasource, Field, FieldRole} from '../domain/datasource/datasource';
-import {TextWidget} from '../domain/dashboard/widget/text-widget';
-import {PageWidget, PageWidgetConfiguration} from 'app/domain/dashboard/widget/page-widget';
-import {Widget} from '../domain/dashboard/widget/widget';
-import {PopupService} from '../common/service/popup.service';
-import {SubscribeArg} from '../common/domain/subscribe-arg';
-import {Alert} from '../common/util/alert.util';
-import {DashboardService} from './service/dashboard.service';
-import {CustomField} from '../domain/workbook/configurations/field/custom-field';
-import {Filter} from '../domain/workbook/configurations/filter/filter';
-import {WidgetService} from './service/widget.service';
-import {ImageService} from '../common/service/image.service';
-import {DashboardLayoutComponent} from './component/dashboard-layout/dashboard.layout.component';
-import {Modal} from '../common/domain/modal';
-import {FilterWidget, FilterWidgetConfiguration} from '../domain/dashboard/widget/filter-widget';
+} from '@domain/dashboard/dashboard';
+import {TextWidget} from '@domain/dashboard/widget/text-widget';
+import {ConnectionType, Datasource, Field, FieldRole} from '@domain/datasource/datasource';
+import {PageWidget, PageWidgetConfiguration} from '@domain/dashboard/widget/page-widget';
+import {Widget} from '@domain/dashboard/widget/widget';
+import {CustomField} from '@domain/workbook/configurations/field/custom-field';
+import {Filter} from '@domain/workbook/configurations/filter/filter';
+import {Pivot} from '@domain/workbook/configurations/pivot';
+import {Shelf, ShelfLayers} from '@domain/workbook/configurations/shelf/shelf';
+import {InclusionFilter} from '@domain/workbook/configurations/filter/inclusion-filter';
+import {WidgetShowType} from '@domain/dashboard/dashboard.globalOptions';
+import {FilterWidget, FilterWidgetConfiguration} from '@domain/dashboard/widget/filter-widget';
+
 import {DatasourceService} from '../datasource/service/datasource.service';
-import {isNullOrUndefined} from 'util';
-import {Pivot} from '../domain/workbook/configurations/pivot';
-import {CommonUtil} from '../common/util/common.util';
+import {PageComponent} from '../page/page.component';
+import {DashboardUtil} from './util/dashboard.util';
+import {FilterUtil} from './util/filter.util';
+import {WidgetService} from './service/widget.service';
+import {DashboardService} from './service/dashboard.service';
+import {ConfigureFiltersComponent} from './filters/configure-filters.component';
 import {PageRelationComponent} from './component/update-dashboard/page-relation.component';
-import {EventBroadcaster} from '../common/event/event.broadcaster';
 import {TextWidgetPanelComponent} from './component/update-dashboard/text-widget-panel.component';
 import {DatasourcePanelComponent} from './component/update-dashboard/datasource-panel.component';
-import {PageComponent} from '../page/page.component';
-import {ActivatedRoute} from '@angular/router';
-import {DashboardPageRelation, DashboardWidgetRelation} from 'app/domain/dashboard/widget/page-widget.relation';
-import {ConfigureFiltersComponent} from './filters/configure-filters.component';
-import {DashboardUtil} from './util/dashboard.util';
-import {WidgetShowType} from '../domain/dashboard/dashboard.globalOptions';
-import {FilterUtil} from './util/filter.util';
-import {ChartType} from '../common/component/chart/option/define/common';
-import {UIMapOption} from '../common/component/chart/option/ui-option/map/ui-map-chart';
-import {Shelf, ShelfLayers} from '../domain/workbook/configurations/shelf/shelf';
-import * as $ from "jquery";
+import {DashboardLayoutComponent} from './component/dashboard-layout/dashboard.layout.component';
 
 @Component({
   selector: 'app-update-dashboard',
   templateUrl: './update-dashboard.component.html'
 })
-export class UpdateDashboardComponent extends DashboardLayoutComponent implements OnInit, OnDestroy {
+export class UpdateDashboardComponent extends DashboardLayoutComponent implements OnInit, AfterViewInit, OnDestroy {
 
   /*-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=
    | ViewChild Variables
@@ -93,7 +97,7 @@ export class UpdateDashboardComponent extends DashboardLayoutComponent implement
   private _configFilterComp: ConfigureFiltersComponent;
 
   // Dashboard util for get dashboard image
-  private dashboardUtil: DashboardUtil = new DashboardUtil();
+  public dashboardUtil: DashboardUtil = new DashboardUtil();
 
   /*-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=
    | Private Variables
@@ -122,9 +126,6 @@ export class UpdateDashboardComponent extends DashboardLayoutComponent implement
   // 편집할 위젯
   public selectedPageWidget: PageWidget;
 
-  // 페이지 위젯 연관 관계 목록
-  public hierarchy: Hierarchy;
-
   // 차트 필터 목록
   public chartFilters: Filter[] = [];
 
@@ -138,7 +139,15 @@ export class UpdateDashboardComponent extends DashboardLayoutComponent implement
 
   public orgBoardInfo: Dashboard;
 
-  public openIndexFilterPanel:number = 0;
+  public hierarchyType: string;
+  public openPanelDefaultFilter: number = -1;             // 오픈 일반 필터 index
+  public defaultFilterListInPanel: Filter[] = [];         // 패널 내 기본 필터 목록
+  public openPanelGeneralFilter: number = 0;              // 오픈 일반 필터 index
+  public generalFilterListInPanel: FilterWidget[] = [];   // 패널 내 일반 필터 목록
+
+  public filterUtil = FilterUtil;
+
+
 
   /*-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=
    | Public - Input Variables
@@ -203,7 +212,7 @@ export class UpdateDashboardComponent extends DashboardLayoutComponent implement
   public ngOnInit() {
     super.ngOnInit();
 
-    // 대시보드 데이터소스 변경
+    // 대시보드 데이터소스 변경 - 관계 설정 및 조인
     this.subscriptions.push(
       this.broadCaster.on<any>('UPDATE_BOARD_UPDATE_DATASOURCE').subscribe(() => {
         this.isUpdateDataSource = true;
@@ -217,7 +226,7 @@ export class UpdateDashboardComponent extends DashboardLayoutComponent implement
         const widget = DashboardUtil.getWidget(this.dashboard, data.widgetId);
         if (widget) {
           widget.name = data.value;
-          this.hierarchy.modify(widget);
+          this.safelyDetectChanges();
         }
       })
     );
@@ -246,8 +255,8 @@ export class UpdateDashboardComponent extends DashboardLayoutComponent implement
     this.subscriptions.push(
       this.broadCaster.on<any>('TOGGLE_SYNC').subscribe((data) => {
         const widgetInfo = DashboardUtil.getWidget(this.dashboard, data.widgetId);
-        const widgetConf = ( widgetInfo.configuration as PageWidgetConfiguration );
-        widgetConf.sync = ( false === widgetConf.sync );
+        const widgetConf = (widgetInfo.configuration as PageWidgetConfiguration);
+        widgetConf.sync = (false === widgetConf.sync);
         DashboardUtil.updateWidget(this.dashboard, widgetInfo);
       })
     );
@@ -258,15 +267,22 @@ export class UpdateDashboardComponent extends DashboardLayoutComponent implement
         this.showBoardLoading();
         const srcWidgetInfo = DashboardUtil.getWidget(this.dashboard, data.widgetId);
         // 복제 위젯 정보 설정 및 생성
-        let newWidgetInfo: PageWidget = <PageWidget>_.cloneDeep(srcWidgetInfo);
+        const newWidgetInfo: PageWidget = _.cloneDeep(srcWidgetInfo) as PageWidget;
         delete newWidgetInfo.id;
         newWidgetInfo.name = srcWidgetInfo.name + '_copy';
         const board: Dashboard = this.dashboard;
         this.widgetService.createWidget(newWidgetInfo, board.id).then(resWidgetInfo => {
           const pageWidget: PageWidget = _.extend(new PageWidget(), resWidgetInfo);
-          this.dashboard = DashboardUtil.addWidget(this.dashboard, pageWidget);
+
+          // 위젯필터가 있는 경우 정보 추가
+          if (pageWidget.configuration.filters) {
+            pageWidget.configuration.filters.forEach(filter => {
+              (filter.ui) || (filter.ui = {});
+              filter.ui.widgetId = pageWidget.id;
+            })
+          }
+          this.dashboard = this._addWidget(this.dashboard, pageWidget);
           this.appendWidgetInLayout([pageWidget]);
-          this.copyWidgetEventHandler(pageWidget);
           this.hideBoardLoading();
           this.safelyDetectChanges();
         }).catch(err => this.commonExceptionHandler(err));
@@ -311,27 +327,14 @@ export class UpdateDashboardComponent extends DashboardLayoutComponent implement
 
       if ('modify-page-close' !== data.name) {
         let alertMsg: string = '';
-        const changeWidgetData: PageWidget = <PageWidget>data.data;
+        const changeWidgetData: PageWidget = data.data as PageWidget;
         if ('create-page-complete' === data.name) {
           // 위젯 생성
-          const pageWidget: PageWidget = this.createPageWidget(changeWidgetData, this.isAppendLayout);
-
-          // 연관관계 관련 위젯 등록 및 대시보드 설정 변경
-          this.hierarchy.add(pageWidget);
-          this.dashboard = DashboardUtil.setDashboardConfRelations(
-            this.dashboard, this.hierarchy.get().map(node => node.toPageRelation())
-          );
-
+          this.createPageWidget(changeWidgetData, this.isAppendLayout);
           alertMsg = this.translateService.instant('msg.board.alert.create.chart.success');
         } else if ('modify-page-complete' === data.name) {
-
-          const pageWidget: PageWidget = this.modifyPageWidget(changeWidgetData, true);
-
-          // 연관관계 관련 위젯 변경
-          this.hierarchy.modify(pageWidget);
-
+          this.modifyPageWidget(changeWidgetData, true);
           alertMsg = this.translateService.instant('msg.board.alert.update.chart.success');
-
         }
 
         // 위젯 및 필터 재정리
@@ -355,12 +358,25 @@ export class UpdateDashboardComponent extends DashboardLayoutComponent implement
     });
     // 일괄삭제를 위한 서비스 등록
     this.subscriptions.push(popupSubscribe);
-    $('body').css( 'overflow', 'hidden' );
+    $('body').css('overflow', 'hidden');
+
+
   } // function - ngOnInit
 
   public ngAfterViewInit() {
     super.ngAfterViewInit();
-    this._initViewPage();
+    this.showBoardLoading();
+    const dashboard = this.dashboardService.getCurrentDashboard();
+    this.dashboardService.getDashboard(dashboard.id).then((result: Dashboard) => {
+      this.hideBoardLoading();                   // 로딩 hide
+      this.dashboard = result;
+      this.dashboard.workBook = this.workbook;
+      result.workBook = this.workbook;
+      this._initViewPage();
+    }).catch(() => {
+      // 로딩 hide
+      this.hideBoardLoading();    // 로딩 hide
+    });
   }
 
   /**
@@ -368,7 +384,7 @@ export class UpdateDashboardComponent extends DashboardLayoutComponent implement
    */
   public ngOnDestroy() {
     super.ngOnDestroy();
-    $('body').css( 'overflow', '' );
+    $('body').css('overflow', '');
   } // function - ngOnDestroy
 
   /**
@@ -376,41 +392,33 @@ export class UpdateDashboardComponent extends DashboardLayoutComponent implement
    * @param {string} widgetId
    */
   public editWidgetEventHandler(widgetId: string) {
-    let widget: Widget = DashboardUtil.getWidget(this.dashboard, widgetId);
+    const widget: Widget = DashboardUtil.getWidget(this.dashboard, widgetId);
     switch (widget.type) {
       case 'page' :
         widget.dashBoard = this.dashboard;
         // (<PageWidgetConfiguration>widget.configuration).dataSource = DashboardUtil.getBoardDataSource(this.dashboard);
 
         const pageWidgetConf = widget.configuration as PageWidgetConfiguration;
-        if( pageWidgetConf.filters ) {
-          pageWidgetConf.filters.forEach( filter => {
-            if( !filter['clzField'] ) {
-              filter['clzField'] = DashboardUtil.getFieldByName(this.dashboard, filter.dataSource, filter.field );
+        if (pageWidgetConf.filters) {
+          pageWidgetConf.filters.forEach(filter => {
+            if (!filter['clzField']) {
+              filter['clzField'] = DashboardUtil.getFieldByName(this.dashboard, filter.dataSource, filter.field);
             }
           });
         }
 
-        this.selectedPageWidget = <PageWidget>widget;
+        this.selectedPageWidget = widget as PageWidget;
         this.isShowPage = true;
         break;
       case 'filter' :
-        const filterWidgetConf: FilterWidgetConfiguration = <FilterWidgetConfiguration>widget.configuration;
+        const filterWidgetConf: FilterWidgetConfiguration = widget.configuration as FilterWidgetConfiguration;
         this.openUpdateFilterPopup(filterWidgetConf.filter);
         break;
       case 'text' :
-        this.openTextWidgetEditor(<TextWidget>widget);
+        this.openTextWidgetEditor(widget as TextWidget);
         break;
     }
   } // function - editWidgetEventHandler
-
-  /**
-   * 위젯 복제에 대한 이벤트 핸들러 for Edit Mode
-   * @param {Widget} widget
-   */
-  public copyWidgetEventHandler(widget: Widget) {
-    this.hierarchy.add(widget);
-  } // function - copyWidgetEventHandler
 
   /**
    * Layout 초기 로딩 완료 이벤트 핸들러
@@ -422,12 +430,12 @@ export class UpdateDashboardComponent extends DashboardLayoutComponent implement
   /**
    * unload 전 실행
    */
-  public execBeforeUnload():boolean {
-    let orgInfo:Dashboard = _.cloneDeep(this.orgBoardInfo);
-    let currInfo:Dashboard = _.cloneDeep(this.dashboard);
+  public execBeforeUnload(): boolean {
+    let orgInfo: Dashboard = _.cloneDeep(this.orgBoardInfo);
+    let currInfo: Dashboard = _.cloneDeep(this.dashboard);
 
-    const removeKeys:string[] = ['createdBy', 'createdTime', 'dataSources', 'modifiedBy', 'modifiedTime', '_links', 'workBook' ];
-    removeKeys.forEach( key => {
+    const removeKeys: string[] = ['createdBy', 'createdTime', 'dataSources', 'modifiedBy', 'modifiedTime', '_links', 'workBook'];
+    removeKeys.forEach(key => {
       delete orgInfo[key];
       delete currInfo[key];
     });
@@ -441,10 +449,10 @@ export class UpdateDashboardComponent extends DashboardLayoutComponent implement
       delete item['dashBoard'];
       return item;
     };
-    orgInfo.widgets = orgInfo.widgets.map( convertSpec );
-    currInfo.widgets = currInfo.widgets.map( convertSpec );
-    orgInfo = this.dashboardService.convertSpecToServer( orgInfo );
-    currInfo = this.dashboardService.convertSpecToServer( currInfo );
+    orgInfo.widgets = orgInfo.widgets.map(convertSpec);
+    currInfo.widgets = currInfo.widgets.map(convertSpec);
+    orgInfo = this.dashboardService.convertSpecToServer(orgInfo);
+    currInfo = this.dashboardService.convertSpecToServer(currInfo);
 
     this.useUnloadConfirm = (JSON.stringify(orgInfo) !== JSON.stringify(currInfo));
 
@@ -497,8 +505,8 @@ export class UpdateDashboardComponent extends DashboardLayoutComponent implement
     if ('CREATE' === event.name) {
       this.showBoardLoading();
       this.widgetService.createWidget(event.widget, this.dashboard.id).then(result => {
-        let textWidget: TextWidget = _.merge(event.widget, result);
-        this.dashboard = DashboardUtil.addWidget(this.dashboard, textWidget, this.isAppendLayout);
+        const textWidget: TextWidget = _.merge(event.widget, result);
+        this.dashboard = this._addWidget(this.dashboard, textWidget, this.isAppendLayout);
         this.dashboard.updateId = CommonUtil.getUUID();
         this.renderLayout();
         this.hideBoardLoading();
@@ -520,7 +528,7 @@ export class UpdateDashboardComponent extends DashboardLayoutComponent implement
       CommonUtil.confirm(modal);
     } else {
       this.isAppendLayout = false;
-      let textWidget: TextWidget = event.widget as TextWidget;
+      const textWidget: TextWidget = event.widget as TextWidget;
       this.dashboard = DashboardUtil.updateWidget(this.dashboard, textWidget);
       this.reloadWidget(textWidget);
       this.renderLayout();
@@ -544,8 +552,8 @@ export class UpdateDashboardComponent extends DashboardLayoutComponent implement
     const pageWidget: PageWidget = new PageWidget();
     const board: Dashboard = this.dashboard;
     pageWidget.dashBoard = board;
-    (<PageWidgetConfiguration>pageWidget.configuration).dataSource = DashboardUtil.getFirstBoardDataSource(board);
-    (<PageWidgetConfiguration>pageWidget.configuration).customFields = board.configuration.customFields;
+    (pageWidget.configuration as PageWidgetConfiguration).dataSource = DashboardUtil.getFirstBoardDataSource(board);
+    (pageWidget.configuration as PageWidgetConfiguration).customFields = board.configuration.customFields;
     return pageWidget;
   } // function - addChart
 
@@ -570,7 +578,7 @@ export class UpdateDashboardComponent extends DashboardLayoutComponent implement
     }
 
     // 위젯 목록 추가
-    this.dashboard = DashboardUtil.addWidget(this.dashboard, pageWidget, isAppendLayout);
+    this.dashboard = this._addWidget(this.dashboard, pageWidget, isAppendLayout);
 
     return pageWidget;
   } // function - createPageWidget
@@ -615,7 +623,7 @@ export class UpdateDashboardComponent extends DashboardLayoutComponent implement
    */
   public moveOrNewDashboard(dashboardItem?: Dashboard) {
     this.execBeforeUnload();
-    if( this.useUnloadConfirm ) {
+    if (this.useUnloadConfirm) {
       const modal = new Modal();
       modal.name = this.translateService.instant('msg.board.alert.title.change');
       modal.description = this.translateService.instant('msg.board.alert.desc.move');
@@ -676,8 +684,7 @@ export class UpdateDashboardComponent extends DashboardLayoutComponent implement
         const param = {configuration: _.cloneDeep(result.configuration), name: result.name};
         if ('page' === result.type) {
           if (-1 < this._removeDsEngineNames.indexOf(param.configuration['dataSource']['engineName'])) {
-            this.hierarchy.del(result.id);
-            this.dashboard.configuration.relations = this.hierarchy.get().map(node => node.toPageRelation());
+            this._removeWidgetRelation(result.id, this.dashboard.configuration.relations);
             this.deleteWidgetIds.push(result.id);     // 삭제 위젯 등록
             this.removeWidgetComponent(result.id);    // 대시보드상의 위젯 제거
           } else {
@@ -687,14 +694,13 @@ export class UpdateDashboardComponent extends DashboardLayoutComponent implement
           }
         } else if ('filter' === result.type) {
           if (-1 < this._removeDsEngineNames.indexOf(param.configuration['filter']['dataSource'])) {
+            this._removeWidgetRelation(result.id, this.dashboard.configuration.filterRelations, this.dashboard);
             this.deleteWidgetIds.push(result.id);
             this.removeWidgetComponent(result.id);    // 대시보드상의 위젯 제거
           } else {
-            param.configuration['filter'] = FilterUtil.convertToServerSpecForDashboard(param.configuration['filter']);
-
             promises.push(() => this.widgetService.updateWidget(result.id, param));   // update widget
           }
-        } else if ( 'text' === result.type) {
+        } else if ('text' === result.type) {
           promises.push(() => this.widgetService.updateWidget(result.id, param));   // update widget
         }
       }
@@ -713,7 +719,7 @@ export class UpdateDashboardComponent extends DashboardLayoutComponent implement
     (0 < cntWidgetComps) && (this.resizeToFitScreenForSave());
 
     // 위젯 업데이트 후 작동
-    if( 0 < promises.length ) {
+    if (0 < promises.length) {
       CommonUtil.waterfallPromise(promises).then(() => {
 
         if (0 < cntWidgetComps) {
@@ -748,7 +754,7 @@ export class UpdateDashboardComponent extends DashboardLayoutComponent implement
    */
   public openDismissConfirm() {
     this.execBeforeUnload();
-    if( this.useUnloadConfirm ) {
+    if (this.useUnloadConfirm) {
       const modal = new Modal();
       modal.name = this.translateService.instant('msg.board.alert.title.change');
       modal.description = this.translateService.instant('msg.board.alert.desc.exit');
@@ -784,6 +790,8 @@ export class UpdateDashboardComponent extends DashboardLayoutComponent implement
     this.isUpdateDataSource = false;
   } // function - closeUpdateDataSource
 
+
+
   /**
    * 대시보드의 데이터소스 변경
    * @param {Dashboard} dashboard
@@ -811,12 +819,11 @@ export class UpdateDashboardComponent extends DashboardLayoutComponent implement
       if ('page' !== widget.type) {
         return true;
       } else {
-        const pageConf: PageWidgetConfiguration = <PageWidgetConfiguration>widget.configuration;
+        const pageConf: PageWidgetConfiguration = widget.configuration as PageWidgetConfiguration;
         if (dashboard.dataSources.some(ds => DashboardUtil.isSameDataSource(pageConf.dataSource, ds))) {
           return true;
         } else {
-          this.hierarchy.del(widget.id);
-          this.dashboard = DashboardUtil.setDashboardConfRelations(this.dashboard, this.hierarchy.get().map(node => node.toPageRelation()));
+          this._removeWidgetRelation(widget.id, this.dashboard.configuration.relations);
           this.deleteWidgetIds.push(widget.id);  // 삭제 위젯 등록
           this.removeWidget(widget.id);          // 대시보드상의 위젯 제거
           return false;
@@ -837,23 +844,53 @@ export class UpdateDashboardComponent extends DashboardLayoutComponent implement
    |-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=*/
   /**
    * 페이지 연관관계 설정 팝업 오픈
+   * @param {string} type
    */
-  public showSetPageRelation() {
-    this._pageRelationComp.run(this.hierarchy.get(), DashboardUtil.getPageWidgets(this.dashboard));
+  public showSetPageRelation(type: string) {
+    if ('filter' === type) {
+      this.hierarchyType = 'filter';
+      this.safelyDetectChanges();
+      this._pageRelationComp.run({
+        nodes: this.dashboard.configuration.filterRelations,
+        widgets: DashboardUtil.getFilterWidgets(this.dashboard),
+        title: 'Set filter hierarchy', description: 'This is description'
+      });
+    } else {
+      this.hierarchyType = 'page';
+      this.safelyDetectChanges();
+      this._pageRelationComp.run({
+        nodes: this.dashboard.configuration.relations,
+        widgets: DashboardUtil.getPageWidgets(this.dashboard)
+      });
+    }
+
   } // function - showSetPageRelation
 
   /**
-   * 페이지 위젯 연관관계 변경 이벤트 핸들러
-   * @param {DashboardWidgetRelation[]} widgetRels
+   * 위젯 연관관계 변경 이벤트 핸들러
+   * @param data
    */
-  public changePageWidgetRelation(widgetRels: DashboardWidgetRelation[]) {
-    if (widgetRels) {
+  public changeWidgetRelation(data: { relations: DashboardWidgetRelation[], type: string }) {
+    if (data.relations) {
       this.destroyDragSources();
-      this.hierarchy.set(widgetRels);
-      this.dashboard = DashboardUtil.setDashboardConfRelations(this.dashboard, widgetRels.map(node => node.toPageRelation()));
+
+      if (data.type === 'page') {
+        this.dashboard.configuration.relations = data.relations;
+      } else {
+        // dragSource 를 재설정하기 위해서는 List 전체 초기화가 이루어져야 함
+        this.dashboard.configuration.filterRelations = [];
+        this.defaultFilterListInPanel = this._getDefaultFilterListInPanel();
+        this.generalFilterListInPanel = this._getGeneralFilterListInPanel();
+        this.safelyDetectChanges();
+        this.dashboard.configuration.filterRelations = data.relations;
+        this._generateFilterRelationMap(this.dashboard);
+        this.defaultFilterListInPanel = this._getDefaultFilterListInPanel();
+        this.generalFilterListInPanel = this._getGeneralFilterListInPanel();
+      }
+
       this.refreshLayout();
     }
-  } // function - changePageWidgetRelation
+  } // function - changeWidgetRelation
 
   /**
    * 위젯의 타입을 얻는다. Page 위젯일 경우에는 차트에 대한 타입을 얻는다.
@@ -865,7 +902,7 @@ export class UpdateDashboardComponent extends DashboardLayoutComponent implement
     if (widget) {
       let strType: string = widget.type;
       if ('page' === widget.type) {
-        strType = (<PageWidgetConfiguration>widget.configuration).chart.type.toString();
+        strType = (widget.configuration as PageWidgetConfiguration).chart.type.toString();
       }
       return strType;
     } else {
@@ -876,26 +913,28 @@ export class UpdateDashboardComponent extends DashboardLayoutComponent implement
   /**
    * 페이지 위젯 드래그 설정
    * @param {ElementRef} elm : 대상 ElementRef
-   * @param {Widget} item : 아이템 정보
+   * @param {string} widgetId : 위젯 아이디
    */
-  public setDragWidget(elm: ElementRef, item: Widget) {
-    this.setDragSource(elm.nativeElement, item);
+  public setDragWidget(elm: ElementRef, widgetId: string) {
+    const widgetInfo: Widget = DashboardUtil.getWidget(this.dashboard, widgetId);
+    if (widgetInfo) {
+      this.setDragSource(elm.nativeElement, widgetInfo);
+    }
   } // function - setDragWidget
 
   /**
-   * 위젯 삭제 등록
+   * 차트 삭제 등록
    * @param {string} widgetId
    */
-  public setRemoveWidget(widgetId: string) {
-    if (this.hierarchy.isLeaf(widgetId)) {
+  public setRemoveChart(widgetId: string) {
+    if (this._isLeafWidgetRelation(widgetId, this.dashboard.configuration.relations)) {
       const modal = new Modal();
       modal.name = this.translateService.instant('msg.comm.ui.del.description');
       modal.btnName = this.translateService.instant('msg.comm.btn.del');
       modal.data = {type: 'removePageWidget'};
       modal.afterConfirm = () => {
         // 연관관계 정보 삭제 및 relation 정보 갱신
-        this.hierarchy.del(widgetId);
-        this.dashboard = DashboardUtil.setDashboardConfRelations(this.dashboard, this.hierarchy.get().map(node => node.toPageRelation()));
+        this._removeWidgetRelation(widgetId, this.dashboard.configuration.relations);
         this.deleteWidgetIds.push(widgetId);  // 삭제 위젯 등록
         this.removeWidget(widgetId);          // 대시보드상의 위젯 제거
 
@@ -906,7 +945,7 @@ export class UpdateDashboardComponent extends DashboardLayoutComponent implement
     } else {
       Alert.warning(this.translateService.instant('msg.board.alert.remove-not-parent'));
     }
-  } // function - setRemoveWidget
+  } // function - setRemoveChart
 
   /*-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=
    | Public Method - Page Widget
@@ -932,6 +971,15 @@ export class UpdateDashboardComponent extends DashboardLayoutComponent implement
   } // function - updateFieldAndWidgetPivotAndRender
 
   /**
+   * 위젯 이름 조회
+   * @param {string} widgetId
+   */
+  public getWidgetName(widgetId: string): string {
+    const widgetInfo: Widget = DashboardUtil.getWidget(this.dashboard, widgetId);
+    return (widgetInfo) ? widgetInfo.name : '';
+  } // function - getWidgetName
+
+  /**
    * 차트 필드 배열 문자를 얻음
    * @param {string} widgetId
    * @returns {string}
@@ -946,16 +994,16 @@ export class UpdateDashboardComponent extends DashboardLayoutComponent implement
       // set shelf layers (map chart)
       let shelf: any = widget.configuration['shelf'];
       const layerNum: number = widget.configuration['chart'].layerNum;
-      if (shelf && undefined !== layerNum && shelf.layers[layerNum] && ( shelf.layers[layerNum].length > 0 || shelf.layers[layerNum].fields.length > 0)) {
+      if (shelf && undefined !== layerNum && shelf.layers[layerNum] && (shelf.layers[layerNum].length > 0 || shelf.layers[layerNum].fields.length > 0)) {
 
         // 기존 스펙이 남아있을경우 변환
-        if( _.isUndefined( shelf.layers[layerNum].fields ) ){
-          let tempShelf : Shelf = new Shelf();
-          for(let idx=0; idx<shelf.layers.length; idx++) {
-            let tempLayer : any = _.cloneDeep(shelf.layers[idx]);
-            if( _.isUndefined(tempShelf.layers[idx]) ){
-              let shelfLayers : ShelfLayers = new ShelfLayers();
-              tempShelf.layers.push( shelfLayers );
+        if (_.isUndefined(shelf.layers[layerNum].fields)) {
+          const tempShelf: Shelf = new Shelf();
+          for (let idx = 0; idx < shelf.layers.length; idx++) {
+            const tempLayer: any = _.cloneDeep(shelf.layers[idx]);
+            if (_.isUndefined(tempShelf.layers[idx])) {
+              const shelfLayers: ShelfLayers = new ShelfLayers();
+              tempShelf.layers.push(shelfLayers);
             }
             tempShelf.layers[idx].fields = tempLayer;
           }
@@ -1018,17 +1066,16 @@ export class UpdateDashboardComponent extends DashboardLayoutComponent implement
   /*-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=
    | Public Method - Filter Widget Panel
    |-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=*/
-  public filterUtil = FilterUtil;
 
   // noinspection JSMethodCanBeStatic
   /**
    * 필터 목록의
-   * @param index
+   * @param _index
    * @param {FilterWidget} filterWidget
    * @return {string}
    */
-  public filterListTrackByFn(index, filterWidget: FilterWidget) {
-    const filter: Filter = (<FilterWidgetConfiguration>filterWidget.configuration).filter;
+  public filterListTrackByFn(_index, filterWidget: FilterWidget) {
+    const filter: Filter = (filterWidget.configuration as FilterWidgetConfiguration).filter;
     return filter.dataSource + filter.type + filter.field;
   } // function - trackByFn
 
@@ -1062,8 +1109,20 @@ export class UpdateDashboardComponent extends DashboardLayoutComponent implement
    * @return {Filter}
    */
   public getFilterForFilterWidget(item: FilterWidget): Filter {
-    return (<FilterWidgetConfiguration>item.configuration).filter;
+    return (item.configuration as FilterWidgetConfiguration).filter;
   } // function - getFilterForFilterWidget
+
+  /**
+   * 필터 위젯의 관계 설정
+   */
+  public isPossibleSettingFilterRelation(): boolean {
+    const boardConf: BoardConfiguration = this.dashboard.configuration;
+    if (boardConf && boardConf.filters && 1 < boardConf.filters.length) {
+      return 1 < boardConf.filters.filter(item => 'include' === item.type).length;
+    } else {
+      return false;
+    }
+  } // function - isPossibleSettingFilterRelation
 
   /*-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=
    | Public Method - Dashboard Layout Panel
@@ -1141,17 +1200,17 @@ export class UpdateDashboardComponent extends DashboardLayoutComponent implement
       widgets.forEach((widget: Widget) => {
         //  차트인 의 컬럼이 사용중일경우
         if (widget.configuration && widget.configuration.hasOwnProperty('pivot') && widget.configuration['pivot'].hasOwnProperty('columns')) {
-          const idx = _.findIndex(widget.configuration['pivot']['columns'], {name: field.name});
-          if (idx > -1) useChartList.push(widget.name);
+          const colIdx = _.findIndex(widget.configuration['pivot']['columns'], {name: field.name});
+          if (colIdx > -1) useChartList.push(widget.name);
         }
         //
         if (widget.configuration && widget.configuration.hasOwnProperty('pivot') && widget.configuration['pivot'].hasOwnProperty('aggregations')) {
-          const idx = _.findIndex(widget.configuration['pivot']['aggregations'], {name: field.name});
-          if (idx > -1) useChartList.push(widget.name);
+          const aggrIdx = _.findIndex(widget.configuration['pivot']['aggregations'], {name: field.name});
+          if (aggrIdx > -1) useChartList.push(widget.name);
         }
         if (widget.configuration && widget.configuration.hasOwnProperty('pivot') && widget.configuration['pivot'].hasOwnProperty('rows')) {
-          const idx = _.findIndex(widget.configuration['pivot']['rows'], {name: field.name});
-          if (idx > -1) useChartList.push(widget.name);
+          const rowIdx = _.findIndex(widget.configuration['pivot']['rows'], {name: field.name});
+          if (rowIdx > -1) useChartList.push(widget.name);
         }
       });
     }
@@ -1160,7 +1219,7 @@ export class UpdateDashboardComponent extends DashboardLayoutComponent implement
     let idx = _.findIndex(this.chartFilters, {field: field.name});
     if (idx > -1) useFilterList.push(this.chartFilters[idx].type + '_' + this.chartFilters[idx].field);
     // 글로벌필터에서 사용중인지 체크
-    const boardFilter: Filter = DashboardUtil.getBoardFilter(this.dashboard, <Field>field);
+    const boardFilter: Filter = DashboardUtil.getBoardFilter(this.dashboard, field.dataSource, field.name);
     (boardFilter) && (useFilterList.push(boardFilter.type + '_' + boardFilter.field));
 
     // 사용중인 곳이 있으면 알림 팝업
@@ -1206,9 +1265,9 @@ export class UpdateDashboardComponent extends DashboardLayoutComponent implement
   /**
    * 필터 변경
    * @param {Filter} filter
-   * @param {boolean} isSetPanel
+   * @param {boolean} _isSetPanel
    */
-  public updateFilter(filter: Filter, isSetPanel: boolean = false) {
+  public updateFilter(filter: Filter, _isSetPanel: boolean = false) {
 
     this.showBoardLoading();
 
@@ -1219,23 +1278,78 @@ export class UpdateDashboardComponent extends DashboardLayoutComponent implement
     // 차트 필터에서 변경한 경우를 위해서 차트 필터에서 제거한다.
     this._changeChartFilterToGlobalFilter(filter);
 
+    // 변경된 필터가 어떤 필터의 상위 필터인 경우 하위 필터의 값을 초기화 해준다. - S
+    {
+      const findRelationInfo = (targetId: string, items: DashboardWidgetRelation[], callback: (relItem: DashboardWidgetRelation) => void) => {
+        return items.some((relItem: DashboardWidgetRelation) => {
+          if (targetId === relItem.ref) {
+            return callback(relItem);
+          } else {
+            if (relItem.children) {
+              return findRelationInfo(targetId, relItem.children, callback);
+            } else {
+              return false;
+            }
+          }
+        });
+      };
+      const recursiveRelation = (items: DashboardWidgetRelation[], execFunc: (rel: string) => void) => {
+        return items.some((relItem: DashboardWidgetRelation) => {
+          execFunc(relItem.ref);
+          if (relItem.children) {
+            return recursiveRelation(relItem.children, execFunc);
+          } else {
+            return false;
+          }
+        });
+      };
+      const filterWidget: FilterWidget = DashboardUtil.getFilterWidgetByFilter(this.dashboard, filter);
+      findRelationInfo(
+        filterWidget.id,
+        this.dashboard.configuration.filterRelations,
+        (relInfo: DashboardWidgetRelation) => {
+          if (relInfo.children && 0 < relInfo.children.length) {
+            recursiveRelation(relInfo.children, (widgetId: string) => {
+              const childFilterWidget: FilterWidget = DashboardUtil.getWidget(this.dashboard, widgetId) as FilterWidget;
+              const targetFilterConf: FilterWidgetConfiguration = childFilterWidget.configuration;
+              this.dashboard.configuration.filters.find(item => {
+                if (item.field === targetFilterConf.filter.field && item.dataSource === targetFilterConf.filter.dataSource) {
+                  if ('include' === item.type) {
+                    (item as InclusionFilter).valueList = [];
+                  }
+                  return true;
+                }
+                return false;
+              });
+            });
+          }
+        });
+    }
+    // 변경된 필터가 어떤 필터의 상위 필터인 경우 하위 필터의 값을 초기화 해준다. - E
+
     // 대시보드 필터 업데이트
-    const updateResult:[Dashboard, boolean] = DashboardUtil.updateBoardFilter(this.dashboard, filter, true);
+    const updateResult: [Dashboard, boolean] = DashboardUtil.updateBoardFilter(this.dashboard, filter, true);
     this.dashboard = updateResult[0];
 
     this._organizeAllFilters(true).then(() => {
       this._syncFilterWidget();
 
-      if( updateResult[1] ) {
+      if (updateResult[1]) {
         // append New Filter
-        this.openIndexFilterPanel = DashboardUtil.getFilterWidgets(this.dashboard).length - 1;
+        this.openPanelDefaultFilter = -1;
+        this.openPanelGeneralFilter = DashboardUtil.getFilterWidgets(this.dashboard).length - 1;
       }
+
+      // 필터 패널 목록을 동기화 해준다.
+      this.defaultFilterListInPanel = this._getDefaultFilterListInPanel();
+      this.generalFilterListInPanel = this._getGeneralFilterListInPanel();
 
       this._configFilterComp.close();
       this.hideBoardLoading();
-      if (isSetPanel) {
-        this.popupService.notiFilter({name: 'change-filter', data: filter});
-      }
+      // if (isSetPanel) {
+      //   this.popupService.notiFilter({name: 'change-filter', data: filter});
+      // }
+      this.popupService.notiFilter({name: 'change-filter', data: filter});
       this.safelyDetectChanges();
     });
 
@@ -1246,8 +1360,9 @@ export class UpdateDashboardComponent extends DashboardLayoutComponent implement
    * @param {Filter} filter
    */
   public configureFilter(filter: Filter) {
-    if( DashboardUtil.isNewFilter( this.dashboard, filter ) ) {
-      this.addFilter( filter, () => {
+
+    if (DashboardUtil.isNewFilter(this.dashboard, filter)) {
+      this.addFilter(filter, () => {
         this.updateFilter(filter, true);
       });
     } else {
@@ -1260,20 +1375,20 @@ export class UpdateDashboardComponent extends DashboardLayoutComponent implement
    * @param {Filter} filter
    * @param {Function} callback
    */
-  public addFilter(filter: Filter, callback?:Function) {
+  public addFilter(filter: Filter, callback?: () => void) {
     if (!filter.ui.widgetId) {
       this.showBoardLoading();
       const newFilterWidget: FilterWidget = new FilterWidget(filter, this.dashboard);
       this.widgetService.createWidget(newFilterWidget, this.dashboard.id).then((result) => {
 
         // 위젯 등록
-        this.dashboard = DashboardUtil.addWidget(this.dashboard, _.merge(newFilterWidget, result));
+        this.dashboard = this._addWidget(this.dashboard, _.merge(newFilterWidget, result));
 
         // 글로벌 필터 업데이트
         filter['isNew'] = true;
         this.dashboard = DashboardUtil.addBoardFilter(this.dashboard, filter);
 
-        ( callback ) && ( callback() );
+        (callback) && (callback());
 
         this.safelyDetectChanges();
 
@@ -1281,6 +1396,9 @@ export class UpdateDashboardComponent extends DashboardLayoutComponent implement
         this.renderLayout();
 
         this.dashboard.updateId = CommonUtil.getUUID();
+
+        this.defaultFilterListInPanel = this._getDefaultFilterListInPanel();
+        this.generalFilterListInPanel = this._getGeneralFilterListInPanel();
 
         this.hideBoardLoading();
       });
@@ -1294,7 +1412,6 @@ export class UpdateDashboardComponent extends DashboardLayoutComponent implement
   public deleteFilter(filter: Filter) {
     if (filter.ui.widgetId) {
       // 차트필터 제거
-
       const widget: PageWidget = DashboardUtil.getWidget(this.dashboard, filter.ui.widgetId) as PageWidget;
 
       if (widget) {
@@ -1315,14 +1432,27 @@ export class UpdateDashboardComponent extends DashboardLayoutComponent implement
 
       // 필터 위젯 정보 삭제
       const filterWidget: FilterWidget = DashboardUtil.getFilterWidgetByFilter(this.dashboard, filter);
+      const isLeaf: boolean = this._isLeafWidgetRelation(filterWidget.id, this.dashboard.configuration.filterRelations, this.dashboard);
+
+      if (!isLeaf) {
+        Alert.warning(this.translateService.instant('msg.board.alert.remove-not-parent-filter'));
+        return;
+      }
+
       if (filterWidget) {
-        this.deleteWidgetIds.push(filterWidget.id);  // 삭제 위젯 등록
         this.removeWidget(filterWidget.id);          // 대시보드상의 위젯 제거
+        this._removeWidgetRelation(filterWidget.id, this.dashboard.configuration.filterRelations, this.dashboard);
+        this.deleteWidgetIds.push(filterWidget.id);  // 삭제 위젯 등록
       }
 
       // 글로벌 필터 삭제
       this.dashboard = DashboardUtil.deleteBoardFilter(this.dashboard, filter);
       this.dashboard.updateId = CommonUtil.getUUID();
+
+      // 패널 목록 동기화
+      this.defaultFilterListInPanel = this._getDefaultFilterListInPanel();
+      this.generalFilterListInPanel = this._getGeneralFilterListInPanel();
+
       this.safelyDetectChanges();
     }
 
@@ -1410,7 +1540,7 @@ export class UpdateDashboardComponent extends DashboardLayoutComponent implement
       widget.configuration['customFields'] = customFields;
       // 위젯 피봇 정보 수정
       // map chart - add shelf config
-      if (ChartType.MAP === (<PageWidgetConfiguration>widget.configuration).chart.type) {
+      if (ChartType.MAP === (widget.configuration as PageWidgetConfiguration).chart.type) {
         widget.configuration['shelf'] = this._syncCustomFieldInWidgetShelf(widget, customFields);
         widget.configuration['shelf'] = this._syncDatasourceAliasInWidgetPivot(widget, fields);
       } else {
@@ -1440,7 +1570,7 @@ export class UpdateDashboardComponent extends DashboardLayoutComponent implement
     DashboardUtil.getPageWidgets(this.dashboard).forEach((widget: Widget) => {
       // 위젯 피봇 정보 수정
       // map chart - add shelf config
-      if (ChartType.MAP === (<PageWidgetConfiguration>widget.configuration).chart.type) {
+      if (ChartType.MAP === (widget.configuration as PageWidgetConfiguration).chart.type) {
         widget.configuration['shelf'] = this._syncDatasourceAliasInWidgetPivot(widget, [changeField]);
       } else {
         widget.configuration['pivot'] = this._syncDatasourceAliasInWidgetPivot(widget, [changeField]);
@@ -1457,23 +1587,66 @@ export class UpdateDashboardComponent extends DashboardLayoutComponent implement
   } // function - _changeFieldAlias
 
   /**
+   * 패널 내 기본 필터 목록 ( 추천 / 필수 )
+   */
+  private _getDefaultFilterListInPanel() {
+    return this.dashboard.configuration.filters.filter(item => 0 < item.ui.filteringSeq);
+  } // function - _getDefaultFilterListInPanel
+
+
+  /**
+   * 패널 내 일반 필터 목록
+   */
+  private _getGeneralFilterListInPanel() {
+    let filterList: FilterWidget[];
+    if (this.dashboard.configuration && this.dashboard.configuration.filterRelations) {
+      const filterRel: DashboardWidgetRelation[] = this.dashboard.configuration.filterRelations;
+
+      const recurrsiveRelation = (items: DashboardWidgetRelation[], hierarchy: { node: string, parent: string }[] = [], parentId: string) => {
+        items.forEach((relItem: DashboardWidgetRelation) => {
+          hierarchy.push({
+            node: relItem.ref,
+            parent: parentId
+          });
+          if (relItem.children && 0 < relItem.children.length) {
+            hierarchy = recurrsiveRelation(relItem.children, [].concat(hierarchy), relItem.ref);
+          }
+        });
+        return hierarchy;
+      };
+
+      filterList = recurrsiveRelation(filterRel, [], '').map(hierarchyItem => {
+        const filterWidget: FilterWidget = DashboardUtil.getWidget(this.dashboard, hierarchyItem.node) as FilterWidget;
+        if (filterWidget) {
+          filterWidget.parent = DashboardUtil.getWidget(this.dashboard, hierarchyItem.parent) as FilterWidget;
+        }
+        return filterWidget;
+      }).filter(item => !!item);
+    } else {
+      filterList = DashboardUtil.getBoardFilters(this.dashboard)
+        .map(filter => DashboardUtil.getFilterWidgetByFilter(this.dashboard, filter));
+    }
+    return filterList.filter(filter => isObject(filter));
+  } // function - _getGeneralFilterListInPanel
+
+  /**
    * 위젯 피봇 / shelf 내 별칭 정보 동기화
    * @param {Widget} widget
    * @param {Field[]} fields
    * @private
    */
   private _syncDatasourceAliasInWidgetPivot(widget: Widget, fields: Field[]) {
-    let widgetConfig = (<PageWidgetConfiguration>widget.configuration);
+    const widgetConfig = widget.configuration as PageWidgetConfiguration;
 
     // map chart - add shelf config
-    let mapFl = (ChartType.MAP === widgetConfig.chart.type);
+    const mapFl = (ChartType.MAP === widgetConfig.chart.type);
 
     if (fields) {
       fields.filter(field => field.nameAlias).forEach((field: Field) => {
 
         // when it's map, set shelf alias
         if (mapFl) {
-          PageComponent.updateShelfAliasFromField(widgetConfig.shelf, field, (<UIMapOption>widgetConfig.chart).layerNum);
+          PageComponent.updateShelfAliasFromField(widgetConfig.shelf, field, (widgetConfig.chart as UIMapOption).layerNum);
         } else {
           PageComponent.updatePivotAliasFromField(widgetConfig.pivot, field);
         }
@@ -1548,8 +1721,8 @@ export class UpdateDashboardComponent extends DashboardLayoutComponent implement
    */
   private _syncCustomFieldInWidgetShelf(widget: Widget, customFields: CustomField[]): Shelf {
 
-    const layerNum = (<UIMapOption>(<PageWidgetConfiguration>widget.configuration).chart).layerNum;
-    const shelf: Shelf = (<PageWidgetConfiguration>widget.configuration).shelf;
+    const layerNum = ((widget.configuration as PageWidgetConfiguration).chart as UIMapOption).layerNum;
+    const shelf: Shelf = (widget.configuration as PageWidgetConfiguration).shelf;
     if (customFields) {
       customFields.forEach((field: CustomField) => {
         if (FieldRole.DIMENSION === field.role) {
@@ -1600,11 +1773,9 @@ export class UpdateDashboardComponent extends DashboardLayoutComponent implement
 
     this.useUnloadConfirm = false;
 
-    this.dashboard = this.dashboardService.getCurrentDashboard();
     // 대시보드 설정
     {
-      let boardInfo = this.dashboard;
-      boardInfo.workBook = this.workbook;
+      const boardInfo = this.dashboard;
       // Linked Datasource 인지 그리고 데이터소스가 적재되었는지 여부를 판단함
       const mainDsList: Datasource[] = DashboardUtil.getMainDataSources(boardInfo);
 
@@ -1622,13 +1793,13 @@ export class UpdateDashboardComponent extends DashboardLayoutComponent implement
               const boardDsInfo: BoardDataSource = DashboardUtil.getBoardDataSourceFromDataSource(boardInfo, dsInfo);
               this.datasourceService.getDatasourceDetail(boardDsInfo['temporaryId']).then((ds: Datasource) => {
                 boardDsInfo.metaDataSource = ds;
-                if( boardInfo.configuration.filters ) {
-                  boardInfo.configuration.filters = ds.temporary.filters.concat( boardInfo.configuration.filters);
+                if (boardInfo.configuration.filters) {
+                  boardInfo.configuration.filters = ds.temporary.filters.concat(boardInfo.configuration.filters);
                 } else {
                   boardInfo.configuration.filters = ds.temporary.filters;
                 }
 
-                res();
+                res(null);
               }).catch(err => rej(err));
             }));
           });
@@ -1663,9 +1834,6 @@ export class UpdateDashboardComponent extends DashboardLayoutComponent implement
 
     this.initializeDashboard(boardInfo, LayoutMode.EDIT).then((dashboard) => {
 
-      // Hierarchy 설정
-      this.hierarchy = new Hierarchy(DashboardUtil.getPageWidgets(dashboard), boardInfo);
-
       // 시작시 초기 작업 실행
       if ('NEW' === this.startupCmd.cmd) {
         this.isAppendLayout = true;
@@ -1687,6 +1855,9 @@ export class UpdateDashboardComponent extends DashboardLayoutComponent implement
       // 필터 셋팅
       this._organizeAllFilters().then(() => {
         (setInitialBoard) && (this.orgBoardInfo = _.cloneDeep(dashboard));
+        this.defaultFilterListInPanel = this._getDefaultFilterListInPanel();
+        this.generalFilterListInPanel = this._getGeneralFilterListInPanel();
+
         this.hideBoardLoading();
         this.changeDetect.detectChanges();
       });
@@ -1712,7 +1883,7 @@ export class UpdateDashboardComponent extends DashboardLayoutComponent implement
           this.imageService.uploadImage(dashboard.name, blobData, dashboard.id, 'page', 250).then((response) => {
             resolve(response);
           }).catch((err) => {
-            console.info(err);
+            console.log(err);
             reject(err);
           });
         }).catch((err) => this.commonExceptionHandler(err));
@@ -1780,7 +1951,7 @@ export class UpdateDashboardComponent extends DashboardLayoutComponent implement
     // Compares the filter widget with the filter information and deletes it for widgets that do not have filter information.
     this.getWidgetComps().forEach((widgetComp) => {
       if (widgetComp.isFilterWidget) {
-        const filterWidget: FilterWidget = <FilterWidget>widgetComp.getWidget();
+        const filterWidget: FilterWidget = widgetComp.getWidget() as FilterWidget;
         const filter = boardFilters.find(item => DashboardUtil.isSameFilterAndWidget(this.dashboard, item, filterWidget));
 
         if (filter) {
@@ -1842,15 +2013,15 @@ export class UpdateDashboardComponent extends DashboardLayoutComponent implement
                 if (isReloadWidget && null !== this.getWidgetComp(filterWidget.id)) {
                   this.reloadWidget(filterWidget);
                 }
-                res2();
+                res2(null);
               }));
             } else {
               promises.push(new Promise((res2) => {
                 const newFilterWidget: FilterWidget = new FilterWidget(filter, this.dashboard);
                 this.widgetService.createWidget(newFilterWidget, this.dashboard.id).then((result) => {
                   // 위젯 등록
-                  this.dashboard = DashboardUtil.addWidget(this.dashboard, _.merge(newFilterWidget, result));
-                  res2();
+                  this.dashboard = this._addWidget(this.dashboard, _.merge(newFilterWidget, result));
+                  res2(null);
                 });
               }));
             }
@@ -1866,14 +2037,14 @@ export class UpdateDashboardComponent extends DashboardLayoutComponent implement
             promises.push(new Promise((res2) => {
               this.widgetService.deleteWidget(widget.id).then(() => {
                 this.removeWidget(widget.id);
-                res2();
+                res2(null);
               });
             }));
           }
         });
 
         Promise.all(promises).then(() => {
-          res1();
+          res1(null);
         }).catch(() => this.hideBoardLoading());
       }
     });
@@ -1882,163 +2053,9 @@ export class UpdateDashboardComponent extends DashboardLayoutComponent implement
 }
 
 enum RightTab {
-  CHART = <any>'CHART',
-  TEXT = <any>'TEXT',
-  FILTER = <any>'FILTER',
-  LAYOUT = <any>'LAYOUT',
-  NONE = <any>'NONE'
+  CHART = 'CHART',
+  TEXT = 'TEXT',
+  FILTER = 'FILTER',
+  LAYOUT = 'LAYOUT',
+  NONE = 'NONE'
 }
-
-/* ++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
-*
-*
-*  Hierarchy 관련
-*
-*
-++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++*/
-
-type HierarchyCallback = (target: DashboardWidgetRelation, list?: DashboardWidgetRelation[]) => boolean;
-
-class Hierarchy {
-
-  /*-=-=-=-=-=-=-=-=-=
-  | Private Variables
-  |-=-=-=-=-=-=-=-=-=-*/
-  private _pageWidgetRels: DashboardWidgetRelation[] = [];
-
-  /*-=-=-=-=-=-=-=-=-=
-  | Constructor
-  |-=-=-=-=-=-=-=-=-=-*/
-  constructor(pageWidgets: Widget[], dashboard: Dashboard) {
-    if (dashboard.configuration.relations) {
-      const rels: DashboardPageRelation[] = dashboard.configuration.relations;
-      this._pageWidgetRels = rels.map(rel => new DashboardWidgetRelation(rel, pageWidgets));
-
-      // 저장이 되지 않아 누락된 위젯 탐색
-      const missingWidgets: Widget[] = pageWidgets.filter(widget => {
-        return !this._findRelationAndRunProc(widget.id, this._pageWidgetRels, () => true);
-      });
-
-      // 누락 위젯 추가
-      missingWidgets.forEach(widget => this.add(widget));
-
-    } else {
-      this._pageWidgetRels = pageWidgets.map(item => this._widgetToRelation(item));
-    }
-  }
-
-  /*-=-=-=-=-=-=-=-=-=-=
-  | Public Method
-  |-=-=-=-=-=-=-=-=-=-=-*/
-  /**
-   * 위젯 추가
-   * @param {Widget} widget
-   */
-  public add(widget: Widget) {
-    (widget) && (this._pageWidgetRels.push(this._widgetToRelation(widget)));
-  } // function - add
-
-  /**
-   * 위젯 수정
-   * @param {Widget} widget
-   */
-  public modify(widget: Widget) {
-    this._findRelationAndRunProc(widget.id, this._pageWidgetRels,
-      (target: DashboardWidgetRelation) => {
-        target.name = widget.name;
-        target.chartType = (<PageWidgetConfiguration>widget.configuration).chart.type.toString();
-        return true;
-      }
-    );
-  } // function - modify
-
-  /**
-   * 위젯 삭제
-   * @param {string} widgetId
-   */
-  public del(widgetId: string) {
-    this._findRelationAndRunProc(widgetId, this._pageWidgetRels,
-      (target: DashboardWidgetRelation, list: DashboardWidgetRelation[]) => {
-        const delIdx: number = list.findIndex(item => item.id === target.id);
-        if (-1 < delIdx) {
-          list.splice(delIdx, 1);
-        }
-        return true;
-      }
-    );
-  } // function - del
-
-  /**
-   * 최하단 노드 여부
-   * @param {string} widgetId
-   * @return {boolean}
-   */
-  public isLeaf(widgetId: string): boolean {
-    return this._findRelationAndRunProc(widgetId, this._pageWidgetRels,
-      (target: DashboardWidgetRelation) => {
-        return !(target.children && 0 < target.children.length);
-      }
-    );
-  } // function - isLeaf
-
-  /**
-   * 연관관계 반환
-   * @returns {DashboardWidgetRelation[]}
-   */
-  public get(): DashboardWidgetRelation[] {
-    return this._pageWidgetRels;
-  } // function - get
-
-  /**
-   * 연관관계 설정
-   * @param {DashboardWidgetRelation[]} data
-   */
-  public set(data: DashboardWidgetRelation[]) {
-    this._pageWidgetRels = data;
-  }
-
-  /*-=-=-=-=-=-=-=-=-=-=
-  | Private Method
-  |-=-=-=-=-=-=-=-=-=-=-*/
-
-  /**
-   * 특정 관계정보를 찾고 기능을 실행한다.
-   * @param {string} widgetId
-   * @param {DashboardWidgetRelation[]} rels
-   * @param {HierarchyCallback} callback
-   * @private
-   */
-  private _findRelationAndRunProc(widgetId: string, rels: DashboardWidgetRelation[], callback: HierarchyCallback): boolean {
-    return rels.some((rel: DashboardWidgetRelation) => {
-      if (widgetId === rel.id) {
-        return callback(rel, rels);
-      } else {
-        if (rel.children) {
-          return this._findRelationAndRunProc(widgetId, rel.children, callback);
-        } else {
-          return false;
-        }
-      }
-    });
-  } // function - _findRelation
-
-  // noinspection JSMethodCanBeStatic
-  /**
-   * 위젯을 관계 데이터로 변경
-   * @param {Widget} widget
-   * @returns {DashboardWidgetRelation}
-   * @private
-   */
-  private _widgetToRelation(widget: Widget): DashboardWidgetRelation {
-    const rel = new DashboardWidgetRelation();
-    rel.id = widget.id;
-    rel.name = widget.name;
-    rel.type = 'page';
-    rel.chartType = (<PageWidgetConfiguration>widget.configuration).chart.type.toString();
-    rel.children = [];
-    return rel;
-  } // function - _widgetToRelation
-
-} // Class - Hierarchy
-
-

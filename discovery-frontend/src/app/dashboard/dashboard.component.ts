@@ -12,6 +12,7 @@
  * limitations under the License.
  */
 
+import {Message} from '@stomp/stompjs';
 import {
   ApplicationRef,
   ChangeDetectionStrategy,
@@ -20,7 +21,7 @@ import {
   ElementRef,
   EventEmitter,
   Injector,
-  Input,
+  Input, OnChanges,
   OnDestroy,
   OnInit,
   Output,
@@ -28,44 +29,42 @@ import {
   SimpleChanges,
   ViewChild
 } from '@angular/core';
-import {Workbook} from '../domain/workbook/workbook';
+import {Modal} from '@common/domain/modal';
+import {Alert} from '@common/util/alert.util';
+import {PopupService} from '@common/service/popup.service';
+import {EventBroadcaster} from '@common/event/event.broadcaster';
+import {CommonConstant} from '@common/constant/common.constant';
+import {CookieConstant} from '@common/constant/cookie.constant';
+import {ChartSelectInfo} from '@common/component/chart/base-chart';
+import {ConfirmModalComponent} from '@common/component/modal/confirm/confirm.component';
+
 import {
   BoardDataSource,
   Dashboard,
+  DashboardWidgetRelation,
   LayoutMode,
   PresentationDashboard
-} from '../domain/dashboard/dashboard';
-import {Widget} from '../domain/dashboard/widget/widget';
-import {ChartSelectInfo} from '../common/component/chart/base-chart';
-import {SelectionFilterComponent} from './component/selection-filter/selection-filter.component';
-import {DashboardLayoutComponent} from './component/dashboard-layout/dashboard.layout.component';
-import {Filter} from '../domain/workbook/configurations/filter/filter';
-import {PopupService} from '../common/service/popup.service';
+} from '@domain/dashboard/dashboard';
+import {Workbook} from '@domain/workbook/workbook';
+import {Widget} from '@domain/dashboard/widget/widget';
+import {FilterWidget} from '@domain/dashboard/widget/filter-widget';
+import {Filter} from '@domain/workbook/configurations/filter/filter';
+import {InclusionFilter} from '@domain/workbook/configurations/filter/inclusion-filter';
+import {ConnectionType, Datasource, TempDsStatus, TemporaryDatasource} from '@domain/datasource/datasource';
+
 import {DatasourceService} from '../datasource/service/datasource.service';
-import {
-  ConnectionType,
-  Datasource,
-  TempDsStatus,
-  TemporaryDatasource
-} from 'app/domain/datasource/datasource';
-import {Modal} from '../common/domain/modal';
-import {ConfirmModalComponent} from '../common/component/modal/confirm/confirm.component';
-import {CommonConstant} from '../common/constant/common.constant';
-import {CookieConstant} from '../common/constant/cookie.constant';
-import {Alert} from '../common/util/alert.util';
 import {WidgetService} from './service/widget.service';
 import {DashboardUtil} from './util/dashboard.util';
-import {EventBroadcaster} from '../common/event/event.broadcaster';
-import {isNullOrUndefined} from "util";
-import {Message} from '@stomp/stompjs';
+import {SelectionFilterComponent} from './component/selection-filter/selection-filter.component';
+import {DashboardLayoutComponent} from './component/dashboard-layout/dashboard.layout.component';
 
 @Component({
   selector: 'app-dashboard',
   templateUrl: './dashboard.component.html',
   changeDetection: ChangeDetectionStrategy.OnPush,
-  styles: [ '.ddp-div-table { position: absolute;top: 0;left: 0;right: 0;bottom: 0; }' ]
+  styles: ['.ddp-div-table { position: absolute;top: 0;left: 0;right: 0;bottom: 0; }']
 })
-export class DashboardComponent extends DashboardLayoutComponent implements OnInit, OnDestroy {
+export class DashboardComponent extends DashboardLayoutComponent implements OnInit, OnChanges, OnDestroy {
 
   /*-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=
    | ViewChild Variables
@@ -94,8 +93,8 @@ export class DashboardComponent extends DashboardLayoutComponent implements OnIn
   public expiredDatasource: Datasource;   // 만료된 데이터소스 정보 ( for Linked Datasource )
   public ingestionStatus: { progress: number, message: string, step?: number };  // 적재 진행 정보
 
-  public isError:boolean = false;
-  public errorMsg:string;
+  public isError: boolean = false;
+  public errorMsg: string;
 
   /*-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=
    | Public - Input Variables
@@ -112,6 +111,12 @@ export class DashboardComponent extends DashboardLayoutComponent implements OnIn
 
   @Input()
   public workbook: Workbook;
+
+  @Input()
+  public isShowSelectionFilter: boolean;
+
+  @Input()
+  public isShowAutoOn: boolean;
 
   /*-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=
    | Public - Output Variables
@@ -151,6 +156,10 @@ export class DashboardComponent extends DashboardLayoutComponent implements OnIn
         this.changeFilterWidgetEventHandler(data.filter);
       })
     );
+
+    if( this.isStandAlone ) {
+      $( 'html' ).addClass( 'sys-embed-board' );
+    }
   } // function - ngOnInit
 
   /**
@@ -176,16 +185,16 @@ export class DashboardComponent extends DashboardLayoutComponent implements OnIn
    * Layout 초기 로딩 완료 이벤트 핸들러
    */
   public onLayoutInitialised() {
-    const ptBoardInfo: PresentationDashboard = <PresentationDashboard>this.dashboard;
+    const ptBoardInfo: PresentationDashboard = this.dashboard as PresentationDashboard;
     if (ptBoardInfo) {
       // 임시 로직 -> 후에 돈일대리와 내용 확인 할 것
-      if (ptBoardInfo.selectionFilters) {
+      if (ptBoardInfo.selectionFilters && this.selectionFilter) {
         ptBoardInfo.selectionFilters.forEach(item => {
           this.selectionFilter.changeFilter(item);
         });
       }
     }
-    this.dashboardEvent.emit({ name: 'LAYOUT_INITIALISED' });
+    this.dashboardEvent.emit({name: 'LAYOUT_INITIALISED'});
   } // function - onLayoutInitialised
 
   /**
@@ -197,12 +206,28 @@ export class DashboardComponent extends DashboardLayoutComponent implements OnIn
     // 필터 정보 갱신
     DashboardUtil.updateBoardFilter(this.dashboard, filter, true);
 
+    // 하위 필터 초기화
+    const filterWidget: FilterWidget = DashboardUtil.getFilterWidgetByFilter(this.dashboard, filter);
+    if (filterWidget) {
+      this._getAllChildWidgetRelation(filterWidget.id, this.dashboard.configuration.filterRelations,
+        (_target: DashboardWidgetRelation, children: string[]) => {
+          children.forEach(childId => {
+            const childWidget: FilterWidget = DashboardUtil.getWidget(this.dashboard, childId) as FilterWidget;
+            (childWidget.configuration.filter as InclusionFilter).valueList = [];
+            DashboardUtil.updateBoardFilter(this.dashboard, childWidget.configuration.filter, true);
+            // 하위 차트 삭제
+          });
+          return true;
+        }, this.dashboard
+      );
+    }
+
     // 대시보드 필터 정보 조회 및 각 위젯 적용
     const boardFilters: Filter[] = DashboardUtil.getBoardFilters(this.dashboard);
     if (boardFilters && boardFilters.length > 0) {
-      this.broadCaster.broadcast('SET_GLOBAL_FILTER', { filters: boardFilters });
+      this.broadCaster.broadcast('SET_GLOBAL_FILTER', {filters: boardFilters, exclude: filter});
     }
-    this.selectionFilter.init();
+    ( this.selectionFilter ) && ( this.selectionFilter.init() );
   } // function - changeFilterWidgetEventHandler
 
   /*-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=
@@ -257,7 +282,7 @@ export class DashboardComponent extends DashboardLayoutComponent implements OnIn
    * request reload board
    */
   public reloadBoard() {
-    this.dashboardEvent.emit({ name: 'RELOAD_BOARD' });
+    this.dashboardEvent.emit({name: 'RELOAD_BOARD'});
   } // function - reloadBoard
 
   /*-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=
@@ -268,7 +293,6 @@ export class DashboardComponent extends DashboardLayoutComponent implements OnIn
    * 만료된 Linked Datasource를 다시 적재한다.
    */
   public reIngestion() {
-
     const modal = new Modal();
     modal.name = this.translateService.instant('msg.board.ui.ingestion.time');
     // modal.btnName = this.translateService.instant('msg.comm.btn.del');
@@ -276,11 +300,11 @@ export class DashboardComponent extends DashboardLayoutComponent implements OnIn
       type: 'RE-INGEST',
       afterConfirm: () => {
         this.datasourceStatus = TempDsStatus.PREPARING;
-        this.ingestionStatus = { progress: 0, message: '', step: 1 };
+        this.ingestionStatus = {progress: 0, message: '', step: 1};
         this.showBoardLoading();
         this.checkAndConnectWebSocket(true).then(() => {
           this.changeDetect.markForCheck();
-          // console.info('>>>> before createLinkedDatasourceTemporary' );
+          // console.log('>>>> before createLinkedDatasourceTemporary' );
           const tempDsInfo: TemporaryDatasource = this.expiredDatasource.temporary;
           this.datasourceService.createLinkedDatasourceTemporary(tempDsInfo.dataSourceId, tempDsInfo.filters)
             .then((result: { id: string, progressTopic }) => {
@@ -310,12 +334,12 @@ export class DashboardComponent extends DashboardLayoutComponent implements OnIn
    */
   private _processIngestion(progressTopic: string) {
     try {
-      // console.info('>>>> progressTopic', progressTopic);
-      const headers: any = { 'X-AUTH-TOKEN': this.cookieService.get(CookieConstant.KEY.LOGIN_TOKEN) };
+      // console.log('>>>> progressTopic', progressTopic);
+      const headers: any = {'X-AUTH-TOKEN': this.cookieService.get(CookieConstant.KEY.LOGIN_TOKEN)};
       // 메세지 수신
       const subscription = CommonConstant.stomp.watch(progressTopic).subscribe((msg: Message) => {
 
-        const data: { progress: number, message: string } = JSON.parse( msg.body );
+        const data: { progress: number, message: string } = JSON.parse(msg.body);
 
         if (-1 === data.progress) {
           this.ingestionStatus = data;
@@ -332,10 +356,10 @@ export class DashboardComponent extends DashboardLayoutComponent implements OnIn
           this.ingestionStatus.step = 2;
           this.changeDetect.markForCheck();
         }
-        console.info('response process', data);
+        console.log('response process', data);
       }, headers);
     } catch (e) {
-      console.info(e);
+      console.log(e);
     }
   } // function - _processIngestion
 
@@ -384,8 +408,8 @@ export class DashboardComponent extends DashboardLayoutComponent implements OnIn
         linkedDsList.forEach(dsInfo => {
           promises.push(new Promise<any>((res, rej) => {
             const boardDsInfo: BoardDataSource = DashboardUtil.getBoardDataSourceFromDataSource(dashboard, dsInfo);
-            if( isNullOrUndefined( boardDsInfo['temporaryId'] ) ) {
-              rej( 'INVALID_LINKED_DATASOURCE' );
+            if (this.isNullOrUndefined(boardDsInfo['temporaryId'])) {
+              rej('INVALID_LINKED_DATASOURCE');
               return;
             }
             this.datasourceService.getDatasourceDetail(boardDsInfo['temporaryId']).then((ds: Datasource) => {
@@ -396,8 +420,8 @@ export class DashboardComponent extends DashboardLayoutComponent implements OnIn
 
               if (ds.temporary && TempDsStatus.ENABLE === ds.temporary.status) {
                 boardDsInfo.metaDataSource = ds;
-                if( dashboard.configuration.filters ) {
-                  dashboard.configuration.filters = ds.temporary.filters.concat( dashboard.configuration.filters);
+                if (dashboard.configuration.filters) {
+                  dashboard.configuration.filters = ds.temporary.filters.concat(dashboard.configuration.filters);
                 } else {
                   dashboard.configuration.filters = ds.temporary.filters;
                 }
@@ -417,7 +441,7 @@ export class DashboardComponent extends DashboardLayoutComponent implements OnIn
                 this.hideBoardLoading();
               }
 
-              res();
+              res(null);
 
             }).catch(err => rej(err));
           }));
@@ -432,7 +456,7 @@ export class DashboardComponent extends DashboardLayoutComponent implements OnIn
           }
           this.safelyDetectChanges();
         }).catch((error) => {
-          if( 'INVALID_LINKED_DATASOURCE' === error ) {
+          if ('INVALID_LINKED_DATASOURCE' === error) {
             this.showError();
             this.onLayoutInitialised();
             this.hideBoardLoading();
@@ -462,6 +486,9 @@ export class DashboardComponent extends DashboardLayoutComponent implements OnIn
    */
   private _runDashboard(targetDashboard: Dashboard) {
     this.initializeDashboard(targetDashboard, this._getLayoutMode()).then(() => {
+      if( 0 === DashboardUtil.getLayoutWidgetInfos(targetDashboard).length ) {
+        this.loadingHide(); // 위젯이 없는 경우, 데이터소스를 교체하면 로딩이 없어지지 않는 현상을 제거하기 위해 추가
+      }
       this.safelyDetectChanges();
     }).catch((error) => {
       console.error(error);

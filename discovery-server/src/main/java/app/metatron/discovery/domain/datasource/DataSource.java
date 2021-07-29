@@ -77,7 +77,8 @@ import app.metatron.discovery.common.GlobalObjectMapper;
 import app.metatron.discovery.common.KeepAsJsonDeserialzier;
 import app.metatron.discovery.common.entity.Spec;
 import app.metatron.discovery.common.exception.MetatronException;
-import app.metatron.discovery.domain.AbstractHistoryEntity;
+import app.metatron.discovery.domain.AbstractTenantEntity;
+import app.metatron.discovery.domain.CollectionPatch;
 import app.metatron.discovery.domain.MetatronDomain;
 import app.metatron.discovery.domain.context.ContextEntity;
 import app.metatron.discovery.domain.dataconnection.DataConnection;
@@ -117,7 +118,7 @@ import static org.hibernate.search.annotations.Index.NO;
         @Index(name = "idx_datasource_engine_name", columnList = "ds_engine_name", unique = true)
     })
 @Indexed
-public class DataSource extends AbstractHistoryEntity implements MetatronDomain<String>, ContextEntity {
+public class DataSource extends AbstractTenantEntity implements MetatronDomain<String>, ContextEntity {
 
   /**
    * ID
@@ -559,6 +560,38 @@ public class DataSource extends AbstractHistoryEntity implements MetatronDomain<
     }
 
     return metaFieldMap;
+  }
+
+  /**
+   * Patch field information
+   *
+   * @param patches
+   */
+  public void patchFields(List<CollectionPatch> patches) {
+
+    Map<Long, Field> fieldMap = getFieldMap();
+
+    for (CollectionPatch patch : patches) {
+      Long fieldId = patch.getLongValue("id");
+      switch (patch.getOp()) {
+        case ADD:
+          fields.add(new Field(patch));
+          break;
+        case REPLACE:
+          if (fieldMap.containsKey(fieldId)) {
+            Field field = fieldMap.get(fieldId);
+            field.updateField(patch);
+          }
+          break;
+        case REMOVE:
+          if (fieldMap.containsKey(fieldId)) {
+            fields.remove(fieldMap.get(fieldId));
+          }
+          break;
+        default:
+          break;
+      }
+    }
   }
 
   /**

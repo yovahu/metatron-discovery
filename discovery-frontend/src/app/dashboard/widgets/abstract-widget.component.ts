@@ -12,16 +12,15 @@
  * limitations under the License.
  */
 
-import { ElementRef, Injector, Input, OnDestroy, OnInit } from '@angular/core';
-import { AbstractComponent } from '../../common/component/abstract.component';
-import { Widget } from '../../domain/dashboard/widget/widget';
-import { EventBroadcaster } from '../../common/event/event.broadcaster';
-import { LayoutMode } from '../../domain/dashboard/dashboard';
-import * as $ from "jquery";
-import {Alert} from "../../common/util/alert.util";
-import {isNullOrUndefined} from "util";
+import {AfterViewInit, ElementRef, Injector, Input, OnDestroy, OnInit} from '@angular/core';
+import {EventBroadcaster} from '@common/event/event.broadcaster';
+import {Alert} from '@common/util/alert.util';
+import {Widget} from '@domain/dashboard/widget/widget';
+import {LayoutMode} from '@domain/dashboard/dashboard';
+import {AbstractDashboardComponent} from '../abstract.dashboard.component';
 
-export abstract class AbstractWidgetComponent extends AbstractComponent implements OnInit, OnDestroy {
+export abstract class AbstractWidgetComponent<T extends Widget> extends AbstractDashboardComponent
+  implements OnInit, AfterViewInit, OnDestroy {
 
   /*-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=
    | Private Variables
@@ -30,7 +29,7 @@ export abstract class AbstractWidgetComponent extends AbstractComponent implemen
   /*-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=
    | Public Variables
    |-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=*/
-  public widget: Widget;
+  public widget: T;
 
   // 위젯 권한 모드
   public isEditMode: boolean = false;
@@ -39,7 +38,7 @@ export abstract class AbstractWidgetComponent extends AbstractComponent implemen
 
   public isVisibleScrollbar: boolean = false;   // 스크롤바 표시 여부 체크
 
-  public isMissingDataSource:boolean = false;
+  public isMissingDataSource: boolean = false;
   public isError: boolean = false;                // 에러 상태 표시 여부
   public errorInfo: { show?: boolean, code?: string, details?: string };    // 에러 정보
 
@@ -60,8 +59,8 @@ export abstract class AbstractWidgetComponent extends AbstractComponent implemen
   // 생성자
   protected constructor(
     protected broadCaster: EventBroadcaster,
-              protected elementRef: ElementRef,
-              protected injector: Injector) {
+    protected elementRef: ElementRef,
+    protected injector: Injector) {
 
     super(elementRef, injector);
   }
@@ -76,19 +75,15 @@ export abstract class AbstractWidgetComponent extends AbstractComponent implemen
   }
 
   public ngAfterViewInit() {
+    super.ngAfterViewInit();
     this.isViewMode = (
       this.layoutMode === LayoutMode.VIEW
       || this.layoutMode === LayoutMode.VIEW_AUTH_MGMT
       || this.layoutMode === LayoutMode.STANDALONE
     );
-    this.isAuthMgmtViewMode = ( this.layoutMode === LayoutMode.VIEW_AUTH_MGMT );
-    this.isEditMode = ( this.layoutMode === LayoutMode.EDIT );
+    this.isAuthMgmtViewMode = (this.layoutMode === LayoutMode.VIEW_AUTH_MGMT);
+    this.isEditMode = (this.layoutMode === LayoutMode.EDIT);
   } // function - ngAfterViewInit
-
-  // Destroy
-  public ngOnDestroy() {
-    super.ngOnDestroy();
-  }
 
   /*-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=
    | Public Method
@@ -98,8 +93,8 @@ export abstract class AbstractWidgetComponent extends AbstractComponent implemen
    * 위젯 수정
    */
   public editWidget() {
-    if( this.isMissingDataSource ) {
-      Alert.warning( this.translateService.instant('msg.board.alert.can-not-edit-missing-datasource') );
+    if (this.isMissingDataSource) {
+      Alert.warning(this.translateService.instant('msg.board.alert.can-not-edit-missing-datasource'));
       return;
     }
     // workbook.component 로 이벤트 전달 -> 워크북에서 대시보드 편집 화면으로 이동시킴
@@ -117,14 +112,14 @@ export abstract class AbstractWidgetComponent extends AbstractComponent implemen
    * 위젯 컴포넌트 구동 시작
    */
   public processStart() {
-    this.broadCaster.broadcast( 'START_PROCESS', { widgetId : this.widget.id } );
+    this.broadCaster.broadcast('START_PROCESS', {widgetId: this.widget.id});
   } // function - processStart
 
   /**
    * 위젯 컴포넌트 구동 종료
    */
   public processEnd() {
-    this.broadCaster.broadcast( 'STOP_PROCESS', { widgetId : this.widget.id } );
+    this.broadCaster.broadcast('STOP_PROCESS', {widgetId: this.widget.id});
   } // function - processEnd
 
   /*-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=
@@ -136,10 +131,10 @@ export abstract class AbstractWidgetComponent extends AbstractComponent implemen
    * @param {{show:boolean, code:string, details:string}} error
    */
   protected _showError(error: { show?: boolean, code?: string, details?: string }) {
-    if( this.isEditMode ) {
+    if (this.isEditMode) {
       this.commonExceptionHandler(error);
     } else {
-      (isNullOrUndefined(error) || typeof error != "object") && (error = {});
+      (this.isNullOrUndefined(error) || typeof error !== 'object') && (error = {});
       error.show = false;
       this.errorInfo = error;
     }

@@ -13,49 +13,59 @@
  */
 
 import {
-  Component, ElementRef, Injector, Input, OnDestroy, OnInit, SimpleChange, SimpleChanges,
+  AfterViewInit,
+  Component,
+  ElementRef,
+  Injector,
+  Input, OnChanges,
+  OnDestroy,
+  OnInit,
+  SimpleChange,
+  SimpleChanges,
   ViewChild
 } from '@angular/core';
 import {ActivatedRoute} from '@angular/router';
 import {AbstractWidgetComponent} from '../abstract-widget.component';
-import {FilterWidget, FilterWidgetConfiguration} from '../../../domain/dashboard/widget/filter-widget';
-import {Filter} from '../../../domain/workbook/configurations/filter/filter';
+import {FilterWidget, FilterWidgetConfiguration} from '@domain/dashboard/widget/filter-widget';
+import {Filter} from '@domain/workbook/configurations/filter/filter';
 import {
   Candidate,
-  InclusionFilter, InclusionItemSort,
-  InclusionSelectorType, InclusionSortBy
-} from '../../../domain/workbook/configurations/filter/inclusion-filter';
-import {Alert} from '../../../common/util/alert.util';
-import {Dashboard} from '../../../domain/dashboard/dashboard';
-import {Field} from '../../../domain/datasource/datasource';
+  InclusionFilter,
+  InclusionItemSort,
+  InclusionSelectorType,
+  InclusionSortBy
+} from '@domain/workbook/configurations/filter/inclusion-filter';
+import {Alert} from '@common/util/alert.util';
+import {BoardConfiguration, Dashboard, DashboardWidgetRelation} from '@domain/dashboard/dashboard';
+import {Field} from '@domain/datasource/datasource';
 
 import * as _ from 'lodash';
-import {SubscribeArg} from '../../../common/domain/subscribe-arg';
-import {PopupService} from '../../../common/service/popup.service';
+import {SubscribeArg} from '@common/domain/subscribe-arg';
+import {PopupService} from '@common/service/popup.service';
 import * as $ from 'jquery';
 import {FilterSelectComponent} from '../../filters/component/filter-select/filter-select.component';
-import {EventBroadcaster} from '../../../common/event/event.broadcaster';
+import {EventBroadcaster} from '@common/event/event.broadcaster';
 import {DatasourceService} from '../../../datasource/service/datasource.service';
 import {BoundFilterComponent} from '../../filters/bound-filter/bound-filter.component';
-import {BoundFilter} from '../../../domain/workbook/configurations/filter/bound-filter';
-import {StringUtil} from '../../../common/util/string.util';
+import {BoundFilter} from '@domain/workbook/configurations/filter/bound-filter';
+import {StringUtil} from '@common/util/string.util';
 import {DashboardUtil} from '../../util/dashboard.util';
 import {FilterUtil} from '../../util/filter.util';
-import {TimeFilter} from '../../../domain/workbook/configurations/filter/time-filter';
-import {TimeRangeFilter} from "../../../domain/workbook/configurations/filter/time-range-filter";
+import {TimeFilter} from '@domain/workbook/configurations/filter/time-filter';
+import {TimeRangeFilter} from '@domain/workbook/configurations/filter/time-range-filter';
 import {
   TimeRelativeFilter,
   TimeRelativeTense
-} from "../../../domain/workbook/configurations/filter/time-relative-filter";
-import {TimeUnit} from "../../../domain/workbook/configurations/field/timestamp-field";
-import {DIRECTION} from '../../../domain/workbook/configurations/sort';
-import {isNullOrUndefined} from 'util';
+} from '@domain/workbook/configurations/filter/time-relative-filter';
+import {TimeUnit} from '@domain/workbook/configurations/field/timestamp-field';
+import {DIRECTION} from '@domain/workbook/configurations/sort';
 
 @Component({
   selector: 'filter-widget',
-  templateUrl: './filter-widget.component.html'
+  templateUrl: './filter-widget.component.html',
+  styleUrls: ['./filter-widget.component.css']
 })
-export class FilterWidgetComponent extends AbstractWidgetComponent implements OnInit, OnDestroy {
+export class FilterWidgetComponent extends AbstractWidgetComponent<FilterWidget> implements OnInit, OnChanges, AfterViewInit, OnDestroy {
 
   /*-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=
    | Private Variables
@@ -74,6 +84,7 @@ export class FilterWidgetComponent extends AbstractWidgetComponent implements On
   /*-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=
    | Public Variables
    |-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=*/
+  public parentWidget: FilterWidget;
 
   public list: string[];
 
@@ -106,6 +117,7 @@ export class FilterWidgetComponent extends AbstractWidgetComponent implements On
   public isRelativeTypeTimeFilter: boolean = false; // Relative Time Filter
   public isRangeTypeTimeFilter: boolean = false;    // Range Time Filter
   public isListTypeTimeFilter: boolean = false;     // List Time Filter
+  public isSingleTypeTimeFilter: boolean = false;   // Single Time Filter
 
   /*-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=
    | Public Variables - Input & Output
@@ -142,7 +154,7 @@ export class FilterWidgetComponent extends AbstractWidgetComponent implements On
     const popupSubscribe = this.popupService.filterView$.subscribe((data: SubscribeArg) => {
       if ('reset-general-filter' === data.name) {
         if (this.filter.ui.importanceType === 'general') {
-          const inclusionFilter: InclusionFilter = (<InclusionFilter>this.filter);
+          const inclusionFilter: InclusionFilter = (this.filter as InclusionFilter);
           inclusionFilter.valueList = [];
           switch (inclusionFilter.selector) {
             case InclusionSelectorType.SINGLE_COMBO:
@@ -170,7 +182,6 @@ export class FilterWidgetComponent extends AbstractWidgetComponent implements On
       })
     );
 
-
     // 위젯 설정 변경 및 새로고침
     this.subscriptions.push(
       this.broadCaster.on<any>('SET_WIDGET_CONFIG').subscribe(data => {
@@ -178,6 +189,34 @@ export class FilterWidgetComponent extends AbstractWidgetComponent implements On
           this.setConfiguration(data.config);
           this.safelyDetectChanges();
         }
+      })
+    );
+
+    // 외부 필터 설정
+    this.subscriptions.push(
+      this.broadCaster.on<any>('SET_GLOBAL_FILTER').subscribe((data) => {
+        this.dashboard.configuration.filters = data.filters;
+        if (this.filter) {
+          if (data.exclude) {
+            if (this.filter.dataSource !== data.exclude.dataSource || this.filter.field !== data.exclude.field) {
+              let isClearValueList: boolean = false;
+              if (this.parentWidget && 'include' === this.filter.type) {
+                isClearValueList = DashboardUtil.isSameFilterAndWidget(this.dashboard, data.exclude, this.parentWidget);
+              }
+              this._candidate(this.filter, isClearValueList);
+            }
+          } else {
+            this._candidate(this.filter);
+          }
+        }
+      })
+    );
+
+    // 필터 콤보박스 옵션 표시 여부
+    this.subscriptions.push(
+      this.broadCaster.on<any>('TIME_DATE_SHOW_SELECT_OPTS').subscribe((data) => {
+        this.toggleOptionsSelectComp(data.isShow);
+        this.changeWidgetOverflow(data.isShow);
       })
     );
 
@@ -189,39 +228,16 @@ export class FilterWidgetComponent extends AbstractWidgetComponent implements On
    */
   public ngOnChanges(changes: SimpleChanges) {
     const widgetChanges: SimpleChange = changes.inputWidget;
-    if (widgetChanges && widgetChanges.currentValue) {
-      this.widget = widgetChanges.currentValue;
-      const filter: Filter = this.getFilter();
-
-      this.dashboard = this.widget.dashBoard;
-      this.field = DashboardUtil.getFieldByName(this.widget.dashBoard, filter.dataSource, filter.field, filter.ref);
-
-      if (this.field) {
-        // 필터 후보값 조회
-        this._candidate(filter);
-      } else {
-        this.processStart();
-        this._showError(
-          {
-            code: 'GB0000',
-            details: this.translateService.instant('msg.board.error.missing-field')
-          }
-        );
-        this.processEnd();
-      }
+    if (this.isLoaded && widgetChanges && widgetChanges.currentValue) {
+      this._initializeFilterWidget(widgetChanges.currentValue);
     }
-
   } // function - ngOnChanges
 
   public ngAfterViewInit() {
     super.ngAfterViewInit();
+    this._initializeFilterWidget(this.inputWidget);
     this.safelyDetectChanges();
   } // function - ngAfterViewInit
-
-  // Destroy
-  public ngOnDestroy() {
-    super.ngOnDestroy();
-  }
 
   /*-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=
    | Public Method
@@ -230,12 +246,8 @@ export class FilterWidgetComponent extends AbstractWidgetComponent implements On
    * 마우스가 벗어남
    */
   public mouseoutWidget() {
-    if (this.filterSelectComponent && this.filterSelectComponent.isShowSelectList ) {
-
+    if (this.filterSelectComponent && this.filterSelectComponent.isShowSelectList) {
       this.filterSelectComponent.toggleSelectList();
-      // this.filterSelectComponent.isShowSelectList = false;
-      // this.safelyDetectChanges();
-      // this.toggleOptionsSelectComp(false);
     }
   } // function - mouseoutWidget
 
@@ -255,10 +267,10 @@ export class FilterWidgetComponent extends AbstractWidgetComponent implements On
    * @return {Filter}
    */
   public getFilter(): Filter {
-    const conf: FilterWidgetConfiguration = <FilterWidgetConfiguration>this.widget.configuration;
+    const conf: FilterWidgetConfiguration = this.widget.configuration as FilterWidgetConfiguration;
     const filter: Filter = _.cloneDeep(conf.filter);
     if (FilterUtil.isTimeFilter(filter)) {
-      this._setTimeFilterStatus(<TimeFilter>filter);
+      this._setTimeFilterStatus(filter as TimeFilter);
     }
     return filter;
   } // function - getFilter
@@ -270,7 +282,7 @@ export class FilterWidgetComponent extends AbstractWidgetComponent implements On
    * @return {InclusionFilter}
    */
   public convertToIncludeFilter(filter: Filter): InclusionFilter {
-    return <InclusionFilter>filter;
+    return filter as InclusionFilter;
   } // function - convertToIncludeFilter
 
   /**
@@ -278,7 +290,13 @@ export class FilterWidgetComponent extends AbstractWidgetComponent implements On
    * @returns {string}
    */
   public getWidgetName(): string {
-    return (this.widget && this.widget.name) ? this.widget.name : this.getConfiguration().filter.field;
+    if (this.widget && this.widget.name) {
+      return this.widget.name;
+    } else if (this.getConfiguration()) {
+      return this.getConfiguration().filter.field;
+    } else {
+      return '';
+    }
   } // function - getWidgetName
 
   /**
@@ -286,7 +304,7 @@ export class FilterWidgetComponent extends AbstractWidgetComponent implements On
    * @returns {FilterWidgetConfiguration}
    */
   public getConfiguration(): FilterWidgetConfiguration {
-    return <FilterWidgetConfiguration>this.widget.configuration;
+    return this.widget ? this.widget.configuration as FilterWidgetConfiguration : null;
   } // function - getConfiguration
 
   // public getDashboard(): Dashboard {
@@ -319,7 +337,7 @@ export class FilterWidgetComponent extends AbstractWidgetComponent implements On
       return;
     }
 
-    const filter = <InclusionFilter>this.filter;
+    const filter = this.filter as InclusionFilter;
 
     if (filter.selector === InclusionSelectorType.MULTI_LIST) {
       const checked = $event.target ? $event.target.checked : $event.currentTarget.checked;
@@ -349,12 +367,29 @@ export class FilterWidgetComponent extends AbstractWidgetComponent implements On
   } // function - toggleOptionsSelectComp
 
   /**
+   * time filter select box z-index 효과를 위한 overflow 조정
+   * @param {boolean} isShowOptions
+   */
+  public changeWidgetOverflow(isShowOptions: boolean) {
+    const $filterWidgetEl = $(this.filterWidget.nativeElement);
+    if(isShowOptions && 'WEEK' === this.filter['timeUnit']){
+      $filterWidgetEl.find('.wrap-time-filter').css({overflow:'visible'});
+      $filterWidgetEl.closest('.ddp-wrap-widget').css({overflow: 'visible'});
+      $filterWidgetEl.find('.ddp-dateinfo-view').css({overflow: 'visible'});
+    } else {
+      $filterWidgetEl.find('.wrap-time-filter').css({overflow:''});
+      $filterWidgetEl.closest('.ddp-wrap-widget').css({overflow: ''});
+      $filterWidgetEl.find('.ddp-dateinfo-view').css({overflow: ''});
+    }
+  } // function - changeWidgetOverflow
+
+  /**
    * Include Filter 값 선택
    * @param item
    */
   public onSelectInclude(item: any) {
 
-    const filter = <InclusionFilter>this.filter;
+    const filter = this.filter as InclusionFilter;
 
     // 수정 모드일 경우 선택이 동작하지 않도록 한다
     if (this.isEditMode && filter.selector !== InclusionSelectorType.MULTI_COMBO) {
@@ -409,6 +444,41 @@ export class FilterWidgetComponent extends AbstractWidgetComponent implements On
     }
   } // function - changeFilterEvent
 
+  /**
+   * TimeRangeFilter 설정
+   */
+  public setTimeRangeFilter() {
+    const conf: FilterWidgetConfiguration = this.widget.configuration as FilterWidgetConfiguration;
+    if (FilterUtil.isTimeFilter(conf.filter)) {
+      const filter: TimeFilter = FilterUtil.convertRelativeToInterval(conf.filter as TimeFilter, this.dashboard);
+      this.filter = filter;
+      this.widget.configuration.filter = filter;
+      this._setTimeFilterStatus(filter as TimeFilter);
+      this._broadcastChangeFilter(filter);
+    }
+  } // function - setTimeRangeFilter
+
+  /**
+   * TimeRelativeFilter 설정
+   */
+  public setTimeRelativeFilter() {
+    const conf: FilterWidgetConfiguration = this.widget.configuration as FilterWidgetConfiguration;
+    let filter: TimeRelativeFilter = _.cloneDeep(conf.filter) as TimeRelativeFilter;
+    if (FilterUtil.isTimeFilter(filter)) {
+      filter.clzField = DashboardUtil.getFieldByName(this.dashboard, filter.dataSource, filter.field);
+      filter = FilterUtil.getTimeRelativeFilter(filter.clzField, filter.timeUnit, 'general');
+      filter.discontinuous = false;
+      filter.timeUnit = TimeUnit.NONE;
+      filter.tense = TimeRelativeTense.PREVIOUS;
+      filter.relTimeUnit = TimeUnit.WEEK;
+      filter.value = 1;
+      this.filter = filter;
+      this.widget.configuration.filter = filter;
+      this._setTimeFilterStatus(filter as TimeFilter);
+      this._broadcastChangeFilter(filter);
+    }
+  } // function - setTimeRelativeFilter
+
   /*-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=
    | Public Method - Measure Filter
    |-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=*/
@@ -428,21 +498,20 @@ export class FilterWidgetComponent extends AbstractWidgetComponent implements On
   } // function - applyValue
 
   public candidateFromSearchText() {
-    if(StringUtil.isEmpty(this.searchText)) {
+    if (StringUtil.isEmpty(this.searchText)) {
       return;
     }
 
     this.loadingShow();
     this.datasourceService.getCandidateForFilter(
       this.filter, this.dashboard, [], null, null, this.searchText).then((resultCandidates) => {
-      if(resultCandidates && resultCandidates.length > 0) {
+      if (resultCandidates && resultCandidates.length > 0) {
         resultCandidates.forEach((resultCandidate) => {
-          if(this.existCandidate(resultCandidate.field) === false) {
-            let candidate = new Candidate();
+          if (this.existCandidate(resultCandidate.field) === false) {
+            const candidate = new Candidate();
             candidate.count = resultCandidate.count;
             candidate.name = resultCandidate.field;
             candidate.isTemporary = true;
-
             this.candidateList.unshift(candidate);
           }
         });
@@ -456,11 +525,11 @@ export class FilterWidgetComponent extends AbstractWidgetComponent implements On
     });
   }
 
-  public isNoFiltering() : boolean {
-    const filter = <InclusionFilter>this.filter;
+  public isNoFiltering(): boolean {
+    const filter = this.filter as InclusionFilter;
 
     return (filter.selector === InclusionSelectorType.SINGLE_COMBO || filter.selector === InclusionSelectorType.MULTI_COMBO)
-    && (filter.valueList && filter.valueList.length == 0);
+      && (filter.valueList && filter.valueList.length === 0);
   }
 
   /*-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=
@@ -487,12 +556,13 @@ export class FilterWidgetComponent extends AbstractWidgetComponent implements On
       const filter: Filter = this.filter;
       const isInterval: boolean = ('interval' === filter.type);
       const isIncludeCombo: boolean = ('include' === filter.type
-        && ((<InclusionFilter>filter).selector === InclusionSelectorType.SINGLE_COMBO
-          || (<InclusionFilter>filter).selector === InclusionSelectorType.MULTI_COMBO));
+        && ((filter as InclusionFilter).selector === InclusionSelectorType.SINGLE_COMBO
+          || (filter as InclusionFilter).selector === InclusionSelectorType.MULTI_COMBO));
       if (isInterval || isIncludeCombo) {
         // 필터 z-index 최상으로 처리
         const $filterWidgetEl = $(this.filterWidget.nativeElement);
-        $filterWidgetEl.closest('.lm_item .lm_stack').css({'z-index': 100, 'position': 'relative'});
+        // $filterWidgetEl.closest('.lm_item .lm_stack').css({'z-index': 100, position: 'relative'});
+        $filterWidgetEl.closest('.lm_item .lm_stack').css({'z-index': '', position: ''});
         $filterWidgetEl.closest('.lm_content').css('overflow', 'inherit');
       }
     }
@@ -507,17 +577,22 @@ export class FilterWidgetComponent extends AbstractWidgetComponent implements On
   private _setContainerZIndex(index: number | string) {
     const $filterWidgetEl = $(this.filterWidget.nativeElement);
     if ('' === index) {
-      $filterWidgetEl.closest('.lm_item .lm_stack').css({'z-index': '', 'position': ''});
+      $filterWidgetEl.closest('.lm_item .lm_stack').css({'z-index': '', position: ''});
     } else {
-      $filterWidgetEl.closest('.lm_item .lm_stack').css({'z-index': index, 'position': 'relative'});
+      $filterWidgetEl.closest('.lm_item .lm_stack').css({'z-index': index, position: 'relative'});
     }
   } // function - _setContainerZIndex
 
   /**
    * Inclusion 및 Bound 필터에 대한 후보값 조회
    * @param {Filter} filter
+   * @param {boolean} isClearValueList
    */
-  private _candidate(filter: Filter) {
+  private _candidate(filter: Filter, isClearValueList: boolean = false) {
+
+    if (!filter) {
+      return;
+    }
 
     // 프로세스 실행 등록
     this.processStart();
@@ -526,15 +601,37 @@ export class FilterWidgetComponent extends AbstractWidgetComponent implements On
     if ('include' === filter.type || 'bound' === filter.type) {
 
       // 필터 데이터 후보 조회
-      // this.datasourceService.getCandidateForFilter(
-      //   this.filter, this.dashboard, this.getFiltersParam(this.filter), this.field).then((result) => {
-      this.datasourceService.getCandidateForFilter(filter, this.dashboard, [], this.field).then((result) => {
+      let prevFilter: Filter[] = [];
+      if (this.parentWidget && 'include' === filter.type) {
+        prevFilter = prevFilter.concat(this.getParentFilter(filter, this.dashboard));
+        // const isSelectedParentFilter: boolean
+        //   = prevFilter.some(item => {
+        //   return DashboardUtil.isSameFilterAndWidget(this.dashboard, item, this.parentWidget)
+        //     && (<InclusionFilter>item).valueList
+        //     && 0 < (<InclusionFilter>item).valueList.length;
+        // });
+        // if (!isSelectedParentFilter) {
+        //   const inclusionFilter: InclusionFilter = <InclusionFilter>filter;
+        //   this.candidateList = [];
+        //   this.filter = inclusionFilter;
+        //   this.processEnd();
+        //   return;
+        // }
+      }
+
+      // 필터 데이터 후보 조회
+      this.datasourceService.getCandidateForFilter(filter, this.dashboard, prevFilter, this.field).then((result) => {
         if ('include' === filter.type) {
 
           // 기본값 설정
-          const inclusionFilter: InclusionFilter = <InclusionFilter>filter;
-          if (inclusionFilter.hasOwnProperty('valueList') && inclusionFilter.valueList.length > 0) {
-            this.selectedItems = inclusionFilter.valueList.map(item => this._stringToCandidate(item));
+          const inclusionFilter: InclusionFilter = filter as InclusionFilter;
+          if (isClearValueList) {
+            this.selectedItems = [];
+            inclusionFilter.valueList = [];
+          } else {
+            if (inclusionFilter.hasOwnProperty('valueList') && inclusionFilter.valueList.length > 0) {
+              this.selectedItems = inclusionFilter.valueList.map(item => this._stringToCandidate(item));
+            }
           }
 
           this.candidateList = [];
@@ -542,37 +639,39 @@ export class FilterWidgetComponent extends AbstractWidgetComponent implements On
           // 사용자 정의 값 추가
           this.addDefineValues(inclusionFilter);
 
-          if(result && Array.isArray(result) && result.length > 100) {
-            this.isSearchingCandidateAvailability = true;
+          this.isSearchingCandidateAvailability = ( result && Array.isArray(result) && result.length > 100 );
+
+          if (this.parentWidget) {
+            // 계층 구조의 하위 필터 목록 처리
+            this.candidateList
+              = result.map(item => this._objToCandidate(item, this.field));
           } else {
-            this.isSearchingCandidateAvailability = false;
-          }
+            // 선택된 후보값 목록
+            const selectedCandidateValues: string[] = inclusionFilter.candidateValues;
 
-          // 선택된 후보값 목록
-          const selectedCandidateValues: string[] = inclusionFilter.candidateValues;
+            // 후보값 추가
+            if (selectedCandidateValues && 0 < selectedCandidateValues.length) {
+              result.forEach((item) => {
+                if (selectedCandidateValues.some(selectedItem => item.field === selectedItem)) {
+                  this.candidateList.push(this._objToCandidate(item, this.field));
+                }
+              });
 
-          // 후보값 추가
-          if (selectedCandidateValues && 0 < selectedCandidateValues.length) {
-            result.forEach((item) => {
-              if (selectedCandidateValues.some(selectedItem => item.field === selectedItem)) {
+              this.candidateList =
+                this.candidateList.concat(
+                  selectedCandidateValues
+                    .map(item => this._stringToCandidate(item))
+                    .filter(item => -1 === this.candidateList.findIndex(can => can.name === item.name))
+                );
+            } else {
+              result.forEach(item => {
                 this.candidateList.push(this._objToCandidate(item, this.field));
-              }
-            });
-
-            this.candidateList =
-              this.candidateList.concat(
-                selectedCandidateValues
-                  .map(item => this._stringToCandidate(item))
-                  .filter(item => -1 === this.candidateList.findIndex(can => can.name === item.name))
-              );
-          } else {
-            result.forEach(item => {
-              this.candidateList.push(this._objToCandidate(item, this.field));
-            });
+              });
+            }
           }
 
           // Sort List
-          if (isNullOrUndefined(inclusionFilter.sort)) {
+          if (this.isNullOrUndefined(inclusionFilter.sort)) {
             inclusionFilter.sort = new InclusionItemSort(InclusionSortBy.TEXT, DIRECTION.ASC);
           }
           if (InclusionSortBy.COUNT === inclusionFilter.sort.by) {
@@ -597,7 +696,7 @@ export class FilterWidgetComponent extends AbstractWidgetComponent implements On
 
           this.filter = inclusionFilter;
         } else if ('bound' === filter.type) {
-          const boundFilter: BoundFilter = <BoundFilter>filter;
+          const boundFilter: BoundFilter = filter as BoundFilter;
           if (result && result.hasOwnProperty('maxValue')) {
             if (boundFilter.min === 0 && boundFilter.max === 0) {
               boundFilter.min = result.minValue;
@@ -653,10 +752,10 @@ export class FilterWidgetComponent extends AbstractWidgetComponent implements On
               });
               return matchedItems.length > 0;
             });
-          } else if (this.filter.type === "bound") {
-            const boundFilter: BoundFilter = <BoundFilter>this.filter;
-            const paramValues: string[] = value.split(",");
-            if (paramValues.length == 2) {
+          } else if (this.filter.type === 'bound') {
+            const boundFilter: BoundFilter = this.filter as BoundFilter;
+            const paramValues: string[] = value.split(',');
+            if (paramValues.length === 2) {
               const min = Number(paramValues[0]);
               const max = Number(paramValues[1]);
               if (!isNaN(min) && !isNaN(max)) {
@@ -666,27 +765,27 @@ export class FilterWidgetComponent extends AbstractWidgetComponent implements On
                 boundFilter.maxValue = max;
               }
             }
-          } else if (this.filter.type === "time_range") {
-            const timeRangeFilter: TimeRangeFilter = <TimeRangeFilter>this.filter;
+          } else if (this.filter.type === 'time_range') {
+            const timeRangeFilter: TimeRangeFilter = this.filter as TimeRangeFilter;
             if (Array.isArray(value)) {
               timeRangeFilter.intervals = value;
             } else {
               timeRangeFilter.intervals = [value];
             }
-          } else if (this.filter.type === "time_relative") {
-            const timeRelativeFilter: TimeRelativeFilter = <TimeRelativeFilter>this.filter;
-            const valueAttributes = value.split(",");
+          } else if (this.filter.type === 'time_relative') {
+            const timeRelativeFilter: TimeRelativeFilter = this.filter as TimeRelativeFilter;
+            const valueAttributes = value.split(',');
             valueAttributes.forEach(attr => {
-              const keyValue: string[] = attr.split(":");
-              if (keyValue[0] === "tense") {
+              const keyValue: string[] = attr.split(':');
+              if (keyValue[0] === 'tense') {
                 timeRelativeFilter.tense = TimeRelativeTense[keyValue[1]];
-              } else if (keyValue[0] === "relTimeUnit") {
+              } else if (keyValue[0] === 'relTimeUnit') {
                 timeRelativeFilter.relTimeUnit = TimeUnit[keyValue[1]];
               } else if (keyValue[0] === 'value') {
                 timeRelativeFilter.value = +keyValue[1];
               }
             });
-          } else if (this.filter.type === "time_list") {
+          } else if (this.filter.type === 'time_list') {
             const paramValues = Array.isArray(value) ? value : [value];
             this.selectedItems = this.candidateList.filter((item: Candidate) => {
               const matchedItems = paramValues.filter(param => {
@@ -747,10 +846,55 @@ export class FilterWidgetComponent extends AbstractWidgetComponent implements On
     }
   } // function - _setIsVisibleScrollbar
 
-  /*-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=
-   | Public Method - Time Filter
-   |-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=*/
+  private existCandidate(name: string): boolean {
+    const filteredCandidates = this.candidateList.filter(candidate => candidate.name === name);
+    return filteredCandidates != null && filteredCandidates.length > 0;
+  }
 
+  /**
+   * 필터 위젯 초기화
+   * @param widgetInfo
+   * @private
+   */
+  private _initializeFilterWidget(widgetInfo: FilterWidget): void {
+    this.widget = widgetInfo;
+    this.dashboard = this.widget.dashBoard;
+    const filter: Filter = this.getFilter();
+
+    if (filter) {
+      this.field = DashboardUtil.getFieldByName(this.widget.dashBoard, filter.dataSource, filter.field, filter.ref);
+
+      // Hierarchy 설정
+      const boardConf: BoardConfiguration = this.widget.dashBoard.configuration;
+      if (boardConf.filterRelations) {
+        const relations: DashboardWidgetRelation[] = boardConf.filterRelations;
+        const parentWidgetId: string = this._findParentWidgetId(this.widget.id, relations);
+        if (parentWidgetId) {
+          this.parentWidget = this.widget.dashBoard.widgets.find(item => item.id === parentWidgetId) as FilterWidget;
+          // this.isShowHierarchyView = true;
+        }
+        // this._childWidgetIds = this._findChildWidgetIds(widget.id, relations);
+      }
+
+      if (this.field) {
+        // 필터 후보값 조회
+        this._candidate(filter);
+      } else {
+        this.processStart();
+        this._showError(
+          {
+            code: 'GB0000',
+            details: this.translateService.instant('msg.board.error.missing-field')
+          }
+        );
+        this.processEnd();
+      }
+    }
+  }
+
+  /*-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=
+   | Private Method - Time Filter
+   |-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=*/
   /**
    * Time Filter 상태값 설정
    * @param {TimeFilter} timeFilter
@@ -764,15 +908,11 @@ export class FilterWidgetComponent extends AbstractWidgetComponent implements On
     this.isRelativeTypeTimeFilter = FilterUtil.isTimeRelativeFilter(timeFilter);
     this.isRangeTypeTimeFilter = FilterUtil.isTimeRangeFilter(timeFilter);
     this.isListTypeTimeFilter = FilterUtil.isTimeListFilter(timeFilter);
-  } // function - _setTimeFilterStatus
-
-  private existCandidate(name : string) : boolean {
-    const filteredCandidates = this.candidateList.filter(candidate => candidate.name === name);
-    if(filteredCandidates != null && filteredCandidates.length > 0) {
-      return true;
-    } else {
-      return false;
+    this.isSingleTypeTimeFilter = FilterUtil.isTimeSingleFilter(timeFilter);
+    if (!this.isEditMode && this.isRelativeTypeTimeFilter) {
+      this.setTimeRangeFilter();
+      this.safelyDetectChanges();
     }
-  }
+  } // function - _setTimeFilterStatus
 
 }

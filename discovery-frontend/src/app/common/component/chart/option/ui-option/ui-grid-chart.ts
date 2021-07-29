@@ -12,11 +12,17 @@
  * limitations under the License.
  */
 
-import { UIOption } from '../ui-option';
+import {UIChartColorByCell, UIOption} from '../ui-option';
 import {
-  AnnotationPosition, FontSize,
-  GridViewType, Operator, UIFontStyle, UIOrient, UIPosition
+  AnnotationPosition,
+  FontSize,
+  GridViewType,
+  Operator,
+  UIFontStyle,
+  UIOrient,
+  UIPosition
 } from '../define/common';
+
 /**
  * 그리드차트 화면 UI에 필요한 옵션
  * Version 2.0
@@ -26,6 +32,8 @@ export interface UIGridChart extends UIOption {
   ////////////////////////////////////////////
   // 서버 스펙
   ////////////////////////////////////////////
+
+  color?: UIChartColorByCell;
 
   // 차트 표현 타입 (피봇, 원본)
   dataType?: GridViewType;
@@ -45,12 +53,19 @@ export interface UIGridChart extends UIOption {
   // 연산행
   totalValueStyle?: TotalValueStyle;
 
+  // 부분 연산행
+  subTotalValueStyle?: TotalValueStyle;
+
   // 연산열
   showCalculatedColumnStyle?: TotalValueStyle;
+
+  // 부분 연산열
+  subTotalColumnStyle?: TotalValueStyle;
 
   ////////////////////////////////////////////
   // UI 스펙
   ////////////////////////////////////////////
+  gridColumnWidth?: any;
 
 }
 

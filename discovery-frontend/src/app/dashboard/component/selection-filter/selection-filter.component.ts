@@ -14,18 +14,21 @@
 
 import * as _ from 'lodash';
 import * as moment from 'moment';
+
 import {Component, ElementRef, Injector, Input, OnDestroy, OnInit} from '@angular/core';
-import {AbstractComponent} from '../../../common/component/abstract.component';
-import {ChartSelectInfo} from '../../../common/component/chart/base-chart';
-import {ChartSelectMode} from '../../../common/component/chart/option/define/common';
-import {Filter} from '../../../domain/workbook/configurations/filter/filter';
-import {EventBroadcaster} from '../../../common/event/event.broadcaster';
-import {TimeUnit} from '../../../domain/workbook/configurations/field/timestamp-field';
-import {InclusionFilter, InclusionSelectorType} from '../../../domain/workbook/configurations/filter/inclusion-filter';
-import {FilterUtil} from "../../util/filter.util";
-import {Dashboard} from "../../../domain/dashboard/dashboard";
-import {DatasourceService} from "../../../datasource/service/datasource.service";
-import {Field} from "../../../domain/datasource/datasource";
+
+import {AbstractComponent} from '@common/component/abstract.component';
+import {ChartSelectInfo} from '@common/component/chart/base-chart';
+import {ChartSelectMode} from '@common/component/chart/option/define/common';
+import {EventBroadcaster} from '@common/event/event.broadcaster';
+import {Filter} from '@domain/workbook/configurations/filter/filter';
+import {TimeUnit} from '@domain/workbook/configurations/field/timestamp-field';
+import {Dashboard} from '@domain/dashboard/dashboard';
+import {Field, IngestionHistory} from '@domain/datasource/datasource';
+import {InclusionFilter, InclusionSelectorType} from '@domain/workbook/configurations/filter/inclusion-filter';
+
+import {FilterUtil} from '../../util/filter.util';
+import {DatasourceService} from '../../../datasource/service/datasource.service';
 
 @Component({
   selector: 'selection-filter',
@@ -39,6 +42,9 @@ export class SelectionFilterComponent extends AbstractComponent implements OnIni
   // 차트 선택 목록 ( 최종 선택된 목록만 저장 ) - 프레젠테이션뷰에 필터 선택을 전달하기 위해 저장
   private _chartSelectionList: ChartSelectInfo[] = [];
 
+  private _fieldCandidateValues: { [key: string]: any[] } = {};
+
+  private _dashboard: Dashboard;
   /*-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=
    | Protected Variables
    |-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=*/
@@ -49,15 +55,31 @@ export class SelectionFilterComponent extends AbstractComponent implements OnIni
   // View용 필터
   public selectionFilterList: SelectionFilter[];
 
-  @Input('dashboard')
-  public dashboard: Dashboard;
-
   @Input()
   public showBtnWidget: boolean = false;
 
   public scrollFreezing: boolean = false;
 
   public boardFilters: Filter[] = [];
+
+  public ingestionHistory: IngestionHistory;
+
+  @Input()
+  public isShowSelectionFilter: boolean;
+  @Input()
+  public isShowAutoOn: boolean;
+
+  /*-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=
+   | Variables - Refresh Trigger 관련
+   |-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=*/
+  private _refreshTimer: any;
+  public isAutoUpdate: boolean = true;
+  public isShowUpdateCycle: boolean = false;
+  public currentUpdatedTime = new Date();
+  public updateTime: string;
+  public historyTime: string;
+  public updateCycle: any[] = [];
+  public currentCycle: any;
 
   /*-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=
    | Constructor
@@ -68,8 +90,26 @@ export class SelectionFilterComponent extends AbstractComponent implements OnIni
               protected broadCaster: EventBroadcaster,
               protected elementRef: ElementRef,
               protected injector: Injector) {
-
     super(elementRef, injector);
+  }
+
+  /*-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=
+   | Getter / Setter
+   |-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=*/
+
+  @Input('dashboard')
+  public set setDashboard(dashboard: Dashboard) {
+    if (this.isLoaded && this._dashboard && dashboard && this._dashboard.id !== dashboard.id) {
+      this._initializeAutoUpdate();
+    }
+    this._dashboard = dashboard;
+    // if (this._dashboard.dataSources && this._dashboard.dataSources.length) {
+    //   this.getBatchHistory(this._dashboard.dataSources[0].id);
+    // }
+  }
+
+  public get isValidDashboard(): boolean {
+    return !!this._dashboard;
   }
 
   /*-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=
@@ -91,6 +131,12 @@ export class SelectionFilterComponent extends AbstractComponent implements OnIni
     );
 
     this.init();
+    if(this.isShowAutoOn){
+      this._initializeAutoUpdate();
+    } else {
+      // 임베디드 대시보드 페이지에서 auto on 을 비가시화 했을 때
+      this.isAutoUpdate = false;
+    }
   }
 
   /**
@@ -98,12 +144,14 @@ export class SelectionFilterComponent extends AbstractComponent implements OnIni
    */
   public ngOnDestroy() {
     super.ngOnDestroy();
+    if (this._refreshTimer) {
+      clearInterval(this._refreshTimer);
+    }
   } // function - ngOnDestroy
 
   /*-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=
    | Public Method
    |-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=*/
-
   /**
    * 차트 선택 정보를 반환한다.
    */
@@ -163,10 +211,10 @@ export class SelectionFilterComponent extends AbstractComponent implements OnIni
     this.selectionFilterList = [];
     this._chartSelectionList = [];
 
-    this.boardFilters = this.dashboard.configuration.filters;
+    this.boardFilters = this._dashboard.configuration.filters;
     FilterUtil.getPanelContentsList(
       this.boardFilters,
-      this.dashboard,
+      this._dashboard,
       (filter: InclusionFilter, field: Field) => {
         this._setInclusionFilter(filter, field);
       }
@@ -223,13 +271,86 @@ export class SelectionFilterComponent extends AbstractComponent implements OnIni
   // noinspection JSMethodCanBeStatic
   /**
    * 타임 범위 필터
-   * @param {SelectionFilter} filter
+   * @param {SelectionFilter} _filter
    * @return {boolean}
    */
-  public isTimeRangeFilter(filter: SelectionFilter): boolean {
+  public isTimeRangeFilter(_filter: SelectionFilter): boolean {
     // return 'timestamp' === filter.type && !filter.format.discontinuous;
     return false;
   } // function - isTimeRangeFilter
+
+  /*-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=
+   | Public Method - 업데이트 트리거 관련
+   |-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=*/
+  /**
+   * @description 자동 업데이트 주기 적용
+   */
+  public applyUpdateCycle() {
+    // console.log(this.updateTime, this.currentCycle.label);
+    this.historyTime = this.updateTime;
+    this.onClickAutoUpdate(true);
+    this.isShowUpdateCycle = !this.isShowUpdateCycle;
+  } // func - applyUpdateCycle
+
+  /**
+   * @description 업데이트 주기의 단위 (초, 분, 시간) 변경시 변경된 단위 받아옴.
+   * @param $event - 선택(변경)된 업데이트 주기
+   */
+  public setCurrentCycle($event: any) {
+    this.currentCycle = $event;
+  } // func - setCurrentCycle
+
+  /**
+   * @description 자동 업데이트 on/off
+   */
+  public onClickAutoUpdate(isCycleUpdated = false, event?: MouseEvent) {
+    if (event) {
+      event.preventDefault();
+      event.stopImmediatePropagation();
+    }
+    if (!isCycleUpdated) {
+      this.isAutoUpdate = !this.isAutoUpdate;
+      this.isShowUpdateCycle = false;
+    }
+    if (this.isAutoUpdate) {
+      let interval = Number(this.updateTime) * 1000;
+      switch (this.currentCycle.value) {
+        case 'second':
+          break;
+        case 'minute':
+          interval = interval * 60;
+          break;
+        case 'hour':
+          interval = interval * 60 * 60;
+          break;
+      }
+      if (this._refreshTimer) {
+        clearInterval(this._refreshTimer);
+      }
+      this._refreshTimer = setInterval(() => {
+        this.updateDashboard();
+      }, interval);
+    } else {
+      clearInterval(this._refreshTimer);
+    }
+  } // func - onClickAutoUpdate
+
+  /**
+   *
+   */
+  public onClickUpdateCancel() {
+    this.updateTime = this.historyTime;
+    this.isShowUpdateCycle = !this.isShowUpdateCycle;
+  } // func - onClickUpdateCancel
+
+  /**
+   * 대시보드 업데이트
+   */
+  public updateDashboard() {
+    this.currentUpdatedTime = new Date();
+    this._broadcastSelection(this._getApiFilters(), true);
+    this.safelyDetectChanges();
+  } // func - updateDashboard
 
   /*-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=
    | Protected Method
@@ -281,6 +402,45 @@ export class SelectionFilterComponent extends AbstractComponent implements OnIni
     });
   } // function - _getApiFilters
 
+  // /**
+  //  * 배치 히스토리 조회
+  //  * @param {string} datasourceId
+  //  */
+  // private getBatchHistory(datasourceId: string) {
+  //   // 로딩 시작
+  //   this.loadingShow();
+  //
+  //   const params = {
+  //     page: this.pageResult.number,
+  //     size: this.pageResult.size
+  //   };
+  //
+  //   this.datasourceService.getBatchHistories(datasourceId, params)
+  //     .then((histories) => {
+  //       this.ingestionHistory = histories['_embedded'].ingestionHistories[0];
+  //       this.loadingHide();
+  //     })
+  //     .catch(() => {
+  //       this.loadingHide();
+  //     });
+  // } // func - getBatchHistory
+
+  /**
+   * 자동 업데이트 관련 초기화
+   * @private
+   */
+  private _initializeAutoUpdate(): void {
+    this.isAutoUpdate = true;
+    this.updateTime = '30';
+    this.historyTime = '30';
+    this.updateCycle = [
+      {label: '분', value: 'minute', checked: true},
+      {label: '시간', value: 'hour', checked: false}
+    ];
+    this.currentCycle = {label: '분', value: 'minute', checked: true};
+    this.onClickAutoUpdate(true);
+  } // func - _initializeAutoUpdate
+
   /**
    * Selection 필터 추가
    * @param {SelectionFilter[]} filters
@@ -291,7 +451,7 @@ export class SelectionFilterComponent extends AbstractComponent implements OnIni
   private _addSelectionFilter(filters: SelectionFilter[], selectInfoData: SelectionInfoData,
                               params: { engineName: string, widgetId: string, selectType: string }) {
 
-    const filter: SelectionFilter = filters.find((filter: SelectionFilter) => filter.field === selectInfoData.name);
+    const filter: SelectionFilter = filters.find((selFilter: SelectionFilter) => selFilter.field === selectInfoData.name);
 
     let newValues = selectInfoData.data;
     (typeof newValues === 'string') && (newValues = [newValues]);
@@ -371,8 +531,8 @@ export class SelectionFilterComponent extends AbstractComponent implements OnIni
         // 데이터를 정렬 할 수 있는 형태로 변환
         const timeValList = filter.valueList.map(item => {
           const splitDate: string[] = item.split(/\s|-/);
-          let strYear: string = '';
-          let strQuarter: string = '';
+          let strYear: string;
+          let strQuarter: string;
           if (-1 < splitDate[0].indexOf('Q')) {
             strYear = splitDate[1];
             strQuarter = splitDate[0];
@@ -404,24 +564,27 @@ export class SelectionFilterComponent extends AbstractComponent implements OnIni
   /**
    * 선택 정보를 전파한다.
    * @param data
+   * @param isForceUpdate - 강제 업데이트 여부
    * @private
    */
-  private _broadcastSelection(data: any) {
+  private _broadcastSelection(data: any, isForceUpdate: boolean = false) {
 
     // 셀렉션필터에 의한 변경
     if (_.isArray(data)) {
-      const selectionFilters: SelectionFilter[] = <SelectionFilter[]>data;
-      // console.info('셀렉션필터에 의한 변경', selectionFilters);
-      // console.info('모든 차트에 필터 추가');
+      const selectionFilters: SelectionFilter[] = data;
+      // console.log('셀렉션필터에 의한 변경', selectionFilters);
+      // console.log('모든 차트에 필터 추가');
 
-      this.broadCaster.broadcast('SET_SELECTION_FILTER', {filters: selectionFilters});
+      this.broadCaster.broadcast('SET_SELECTION_FILTER', {filters: selectionFilters, isForceUpdate: isForceUpdate});
 
     } else {
       // 차트에 의한 변경
-      // console.info('위젯에 의한 변경', data, data.chartSelectInfo.mode);
-      // console.info('위젯 해당 필터들 추가해서 다시 draw 요청');
+      // console.log('위젯에 의한 변경', data, data.chartSelectInfo.mode);
+      // console.log('위젯 해당 필터들 추가해서 다시 draw 요청');
 
-      const externalFilterData: any = {};
+      const externalFilterData: any = {
+        isForceUpdate: isForceUpdate
+      };
 
       // 1. widgets에서 본인차트 제외
       if (data.chartSelectInfo.params && data.chartSelectInfo.params.hasOwnProperty('widgetId')) {
@@ -454,18 +617,18 @@ export class SelectionFilterComponent extends AbstractComponent implements OnIni
       savedList = savedList.filter(savedItem => savedItem.params.widgetId !== newItem.params.widgetId);
       savedList.push(newItem);
     } else {
-      let isMergedWidget: boolean = savedList.some(savedItem => {
+      const isMergedWidget: boolean = savedList.some(savedItem => {
         // 동일 위젯 정보를 찾는다
         if (savedItem.params.widgetId === newItem.params.widgetId) {
           newItem.data.forEach(newItemData => {
 
             // 필드 정보가 존재할 경우 필드 정보 내 데이터를 추가해준다.
-            let isMerged: boolean = savedItem.data.some(savedItemData => {
+            const isMerged: boolean = savedItem.data.some(savedItemData => {
               if (savedItemData.alias === newItemData.alias) {
                 savedItemData.data
                   = savedItemData.data
                   .concat(newItemData.data)
-                  .filter((elem, pos, arr) => arr.indexOf(elem) == pos);
+                  .filter((elem, pos, arr) => arr.indexOf(elem) === pos);
                 return true;
               }
             });
@@ -534,7 +697,7 @@ export class SelectionFilterComponent extends AbstractComponent implements OnIni
     this._chartSelectionList.some((savedItem: ChartSelectInfo, fieldIdx: number) => {
 
       // 지정된 필드의 위치를 찾는다
-      let nEmptyDataIndex: number = savedItem.data.findIndex(savedItemData => savedItemData.alias === filter.alias);
+      const nEmptyDataIndex: number = savedItem.data.findIndex(savedItemData => savedItemData.alias === filter.alias);
 
       // 데이터가 없는 필드에 대해서는 필드를 제거해준다.
       if (-1 < nEmptyDataIndex) {
@@ -553,21 +716,27 @@ export class SelectionFilterComponent extends AbstractComponent implements OnIni
 
   private _setInclusionFilter(filter: InclusionFilter, field: Field) {
 
-    // 필터 데이터 후보 조회
-    this.loadingShow();
-    this.datasourceService.getCandidateForFilter(filter, this.dashboard, [], field).then((result) => {
-
+    const setPanelContents = (candidateValues: any[]) => {
       const valueList: string[] = filter.valueList;
-      if ((valueList && 0 < valueList.length && valueList.length !== result.length)) {
+      if ((valueList && 0 < valueList.length && valueList.length !== candidateValues.length)) {
         filter['panelContents'] = valueList.join(' , ');
       } else {
         filter['panelContents'] = '(' + this.translateService.instant('msg.comm.ui.list.all') + ')';
       }
-
       this.safelyDetectChanges();
+    };
 
-      this.loadingHide();
-    }).catch((error) => console.error(error));
+    if (this._fieldCandidateValues[field.dataSource + '_' + field.name]) {
+      setPanelContents(this._fieldCandidateValues[field.dataSource + '_' + field.name]);
+    } else {
+      // 필터 데이터 후보 조회
+      this.loadingShow();
+      this.datasourceService.getCandidateForFilter(filter, this._dashboard, [], field).then((result) => {
+        this._fieldCandidateValues[field.dataSource + '_' + field.name] = result;
+        setPanelContents(this._fieldCandidateValues[field.dataSource + '_' + field.name]);
+        this.loadingHide();
+      }).catch((error) => console.error(error));
+    }
   } // function - _setInclusionFilter
 }
 

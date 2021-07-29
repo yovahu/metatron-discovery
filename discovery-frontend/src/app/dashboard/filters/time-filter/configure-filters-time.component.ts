@@ -14,16 +14,19 @@
 
 import * as _ from 'lodash';
 import { Component, ElementRef, Injector, OnInit, OnDestroy, ViewChild } from '@angular/core';
+
+import { Dashboard } from '@domain/dashboard/dashboard';
+import { CustomField } from '@domain/workbook/configurations/field/custom-field';
+import { Field } from '@domain/datasource/datasource';
+import { TimeUnit, ByTimeUnit } from '@domain/workbook/configurations/field/timestamp-field';
+import { TimeFilter } from '@domain/workbook/configurations/filter/time-filter';
+
+import { FilterUtil } from '../../util/filter.util';
 import { AbstractFilterPopupComponent } from '../abstract-filter-popup.component';
-import { Dashboard } from '../../../domain/dashboard/dashboard';
-import { CustomField } from '../../../domain/workbook/configurations/field/custom-field';
-import { Field } from '../../../domain/datasource/datasource';
-import { TimeUnit, ByTimeUnit } from '../../../domain/workbook/configurations/field/timestamp-field';
 import { TimeListFilterComponent } from './time-list-filter.component';
 import { TimeRelativeFilterComponent } from './time-relative-filter.component';
 import { TimeRangeFilterComponent } from './time-range-filter.component';
-import { TimeFilter } from '../../../domain/workbook/configurations/filter/time-filter';
-import { FilterUtil } from '../../util/filter.util';
+import {TimeDateFilterComponent} from './time-date-filter.component';
 
 @Component({
   selector: 'app-config-filter-time',
@@ -43,6 +46,8 @@ export class ConfigureFiltersTimeComponent extends AbstractFilterPopupComponent 
   @ViewChild( TimeRangeFilterComponent )
   private _rangeComp:TimeRangeFilterComponent;
 
+  @ViewChild( TimeDateFilterComponent)
+  private _dateComp: TimeDateFilterComponent;
   /*-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=
   | Protected Variables
   |-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=*/
@@ -65,6 +70,7 @@ export class ConfigureFiltersTimeComponent extends AbstractFilterPopupComponent 
   public isRelativeType:boolean = false;    // Relative Time Filter
   public isRangeType:boolean = false;       // Range Time Filter
   public isListType:boolean = false;        // List Time Filter
+  public isSingleType:boolean = false;        // Single Time Filter
 
   /*-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=
   | Constructor
@@ -120,7 +126,6 @@ export class ConfigureFiltersTimeComponent extends AbstractFilterPopupComponent 
    * @return {TimeFilter}
    */
   public getData(): TimeFilter {
-
     let returnData:TimeFilter;
     switch (this.targetFilter.type) {
       case 'time_list' :
@@ -131,6 +136,9 @@ export class ConfigureFiltersTimeComponent extends AbstractFilterPopupComponent 
         break;
       case 'time_range' :
         returnData = this._rangeComp.getData();
+        break;
+      case 'time_single' :
+        returnData = this._dateComp.getData();
         break;
       default :
         returnData = this.targetFilter;
@@ -181,6 +189,14 @@ export class ConfigureFiltersTimeComponent extends AbstractFilterPopupComponent 
   } // function - setTimeListFilter
 
   /**
+   * TimeDateFilter 설정
+   */
+  public setTimeDateFilter() {
+    this.targetFilter = FilterUtil.getTimeDateFilter(this.targetFilter.clzField, this.targetFilter.timeUnit, this.targetFilter.ui.importanceType);
+    this._setStatus();
+  } // function - setTimeOneDateFilter
+
+  /**
    * 타임유닛 변경
    * @param {any} data
    */
@@ -197,6 +213,7 @@ export class ConfigureFiltersTimeComponent extends AbstractFilterPopupComponent 
     this.targetFilter = currFilter;
     this._setStatus();
   } // function - changeTimeUnit
+
   /*-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=
   | Protected Method
   |-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=*/
@@ -215,6 +232,7 @@ export class ConfigureFiltersTimeComponent extends AbstractFilterPopupComponent 
     this.isRelativeType = FilterUtil.isTimeRelativeFilter(this.targetFilter);
     this.isRangeType = FilterUtil.isTimeRangeFilter(this.targetFilter);
     this.isListType = FilterUtil.isTimeListFilter(this.targetFilter);
+    this.isSingleType = FilterUtil.isTimeSingleFilter(this.targetFilter);
   } // function - _setStatus
 
 }

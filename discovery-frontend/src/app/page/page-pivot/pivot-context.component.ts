@@ -12,11 +12,11 @@
  * limitations under the License.
  */
 
-import {AbstractComponent} from '../../common/component/abstract.component';
+import {AbstractComponent} from '@common/component/abstract.component';
 import {
   Component,
   ElementRef,
-  EventEmitter,
+  EventEmitter, HostListener,
   Injector,
   Input,
   OnDestroy,
@@ -25,26 +25,28 @@ import {
   ViewChild
 } from '@angular/core';
 import {Field, Field as AbstractField} from '../../domain/workbook/configurations/field/field';
-import {Alert} from '../../common/util/alert.util';
+import {Alert} from '@common/util/alert.util';
 import * as _ from 'lodash';
-import {StringUtil} from '../../common/util/string.util';
-import {DIRECTION} from '../../domain/workbook/configurations/sort';
-import {ChartType, EventType, SeriesType} from '../../common/component/chart/option/define/common';
-import {AggregationType} from '../../domain/workbook/configurations/field/measure-field';
-import {UIChartAxis} from '../../common/component/chart/option/ui-option/ui-axis';
-import {Modal} from '../../common/domain/modal';
+import {StringUtil} from '@common/util/string.util';
+import {DIRECTION} from '@domain/workbook/configurations/sort';
+import {ChartType, EventType, SeriesType} from '@common/component/chart/option/define/common';
+import {AggregationType} from '@domain/workbook/configurations/field/measure-field';
+import {UIChartAxis} from '@common/component/chart/option/ui-option/ui-axis';
+import {Modal} from '@common/domain/modal';
 import {UIChartColorByValue, UIOption} from '../../common/component/chart/option/ui-option';
-import {ByTimeUnit, GranularityType, TimeUnit} from '../../domain/workbook/configurations/field/timestamp-field';
-import {Pivot} from '../../domain/workbook/configurations/pivot';
-import {PageWidget} from '../../domain/dashboard/widget/page-widget';
-import {Shelf} from '../../domain/workbook/configurations/shelf/shelf';
-import {UIMapOption} from '../../common/component/chart/option/ui-option/map/ui-map-chart';
-import {MapLayerType} from '../../common/component/chart/option/define/map/map-common';
-import {Format} from "../../domain/workbook/configurations/format";
+import {ByTimeUnit, GranularityType, TimeUnit} from '@domain/workbook/configurations/field/timestamp-field';
+import {Pivot} from '@domain/workbook/configurations/pivot';
+import {PageWidget} from '@domain/dashboard/widget/page-widget';
+import {Shelf} from '@domain/workbook/configurations/shelf/shelf';
+import {UIMapOption} from '@common/component/chart/option/ui-option/map/ui-map-chart';
+import {MapLayerType} from '@common/component/chart/option/define/map/map-common';
+import {Format} from '@domain/workbook/configurations/format';
+import {ColorPickerComponent} from '@common/component/color-picker/color.picker.component';
 
 @Component({
   selector: 'pivot-context',
-  templateUrl: './pivot-context.component.html'
+  templateUrl: './pivot-context.component.html',
+  styles: ['.sys-inverted {transform: scaleX(-1);}']
 })
 export class PivotContextComponent extends AbstractComponent implements OnInit, OnDestroy {
 
@@ -56,7 +58,7 @@ export class PivotContextComponent extends AbstractComponent implements OnInit, 
 
   // Widget 데이터의 필터 목록 (필드명만 정제)
   @Input('filterFiledList')
-  public filterFiledList: String[] = [];
+  public filterFiledList: string[] = [];
 
   @Input('widget')
   public widget: PageWidget;
@@ -85,12 +87,21 @@ export class PivotContextComponent extends AbstractComponent implements OnInit, 
   @Output('changePivotContext')
   public changePivotContext: EventEmitter<any> = new EventEmitter();
 
+  @ViewChild('colorPicker')
+  public colorPicker: ColorPickerComponent;
+  public isShowPicker: boolean = false;
+
   // editingField Alias 임시저장용
   public editingFieldAlias: string;
 
   // 2Depth 컨텍스트 메뉴 고정여부
   public fix2DepthContext: boolean = false;
   public fixMeasureFormatContext: boolean = false;
+  public fixMeasureColorContext: boolean = false;
+
+  public get seriesType(): typeof SeriesType {
+    return SeriesType;
+  }
 
   // 생성자
   constructor(protected elementRef: ElementRef,
@@ -98,6 +109,112 @@ export class PivotContextComponent extends AbstractComponent implements OnInit, 
     super(elementRef, injector);
   }
 
+  /**
+   * 마우스 오버 이벤트
+   * @param {MouseEvent} event
+   */
+  @HostListener('document:mouseover', ['$event'])
+  public onMouseOverHost(event: MouseEvent) {
+    if( this.isShowPicker ) {
+      const $target = $(event.target);
+      if( $target.hasClass('sys-individual-color-menu') || $target.closest('.sys-individual-color-menu').length
+        || $target.hasClass('sp-container') || $target.closest('.sp-container').length ) {
+        this.isShowPicker = true;
+      } else {
+        this.isShowPicker = false;
+        this.colorPicker.closePicker();
+      }
+    }
+  } // func - onMouseOverHost
+
+  /*-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=
+   | Getter / Setter
+   |-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=*/
+  public get isCombineChart(): boolean {
+    return this.chartType === 'combine';
+  } // get - isCombineChart
+
+  public get isGridChart(): boolean {
+    return this.chartType === 'grid';
+  } // get - isGridChart
+
+  public get isLabelChart(): boolean {
+    return this.chartType === 'label';
+  } // get - isLabelChart
+
+  public get isMeasureField(): boolean {
+    return this.editingField && this.editingField.type === 'measure';
+  } // get - isMeasureField
+
+  /**
+   * 보조축으로 사용중인 필드여부
+   */
+  public get isSecondaryAxis(): boolean {
+
+    // X, Y축만 있다면 사용중이 아님
+    if (!this.uiOption.secondaryAxis) {
+      return false;
+    }
+
+    if (undefined === this.editingField.isSecondaryAxis) {
+      const aggrIdx = this.pivot.aggregations.findIndex(aggr => {
+        const aggrName = aggr.aggregationType + '(' + aggr.name + ')';
+        const targetName = this.editingField.aggregationType + '(' + this.editingField.name + ')';
+        return (aggrName === targetName);
+      });
+      return (0 !== aggrIdx % 2);
+    } else {
+      // 현재필드의 보조축인지 체크
+      return this.editingField.isSecondaryAxis;
+    }
+  } // get - isSecondaryAxis
+
+  /**
+   * 현재 색상 코드
+   */
+  public get colorCode(): string {
+    if( this.editingField.color ) {
+      return this.editingField.color.rgb ? this.editingField.color.rgb : '#ffcaba';
+    } else {
+      return '';
+    }
+  } // get - colorCode
+
+  /**
+   * 현재 색상 스키마
+   */
+  public get colorSchema(): string {
+    if( this.editingField.color ) {
+      return this.editingField.color.schema ? this.editingField.color.schema.key : 'VC1';
+    } else {
+      return '';
+    }
+  } // get - colorSchema
+
+  /**
+   * 현재 스키마 순번
+   */
+  public get colorSchemaIdx(): number {
+    if( this.editingField.color ) {
+      return this.editingField.color.schema ? this.editingField.color.schema.idx : 1;
+    } else {
+      return 0;
+    }
+  } // get - colorSchemaIdx
+
+  /**
+   * 현재 스키마 반전 여부
+   */
+  public isInvertedColorSchema():boolean {
+    if( this.editingField.color ) {
+      return this.editingField.color.schema ? this.editingField.color.schema.key.indexOf('R') === 0 : false;
+    } else {
+      return false;
+    }
+  } // get - isInvertedColorSchema
+  /*-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=
+   | Public Method
+   |-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=*/
   /**
    * 필터 On / Off 핸들러
    */
@@ -112,6 +229,15 @@ export class PivotContextComponent extends AbstractComponent implements OnInit, 
     // emit
     this.changePivotContext.emit({type: 'toggleFilter', value: this.editingField});
   }
+
+  /**
+   * 2 뎁스 메뉴 숨김
+   */
+  public hideAllSubContext(): void {
+    this.fix2DepthContext = false;
+    this.fixMeasureFormatContext = false;
+    this.fixMeasureColorContext = false;
+  } // func - hideAllSubContext
 
   /**
    * 마우스 오버시 필드 별칭 입력 초기값 설정
@@ -171,15 +297,15 @@ export class PivotContextComponent extends AbstractComponent implements OnInit, 
     }
 
     // return pivot or shelf by chart type
-    let list = this.returnPivotShelf();
+    const list = this.returnPivotShelf();
 
     // 중복체크
     let duppIndex: number = _.findIndex(list, (item) => {
-      return item.pivotAlias == this.editingFieldAlias || item.fieldAlias == this.editingFieldAlias;
+      return item.pivotAlias === this.editingFieldAlias || item.fieldAlias === this.editingFieldAlias;
     });
-    if (duppIndex == -1) {
+    if (duppIndex === -1) {
       this.widget.dashBoard.configuration['fields'].forEach((field, index) => {
-        if (field.nameAlias && field.nameAlias['nameAlias'] == this.editingFieldAlias) {
+        if (field.nameAlias && field.nameAlias['nameAlias'] === this.editingFieldAlias) {
           duppIndex = index;
           return false;
         }
@@ -193,13 +319,13 @@ export class PivotContextComponent extends AbstractComponent implements OnInit, 
     }
 
     // 값이 없다면 Reset 처리
-    if (this.editingFieldAlias.trim() == '') {
+    if (this.editingFieldAlias.trim() === '') {
       this.onAliasReset(null);
       return;
     }
 
     // 값 적용
-    this.editingFieldAlias = this.editingFieldAlias == this.editingField.name ? this.editingFieldAlias + ' ' : this.editingFieldAlias;
+    this.editingFieldAlias = this.editingFieldAlias === this.editingField.name ? this.editingFieldAlias + ' ' : this.editingFieldAlias;
     this.editingField.alias = this.editingFieldAlias;
     this.editingField.pivotAlias = this.editingFieldAlias;
     this.fix2DepthContext = false;
@@ -242,7 +368,7 @@ export class PivotContextComponent extends AbstractComponent implements OnInit, 
   }
 
   // editFilter AlignName
-  protected getAlignName() {
+  public getAlignName() {
     if (this.editingField.direction === DIRECTION.ASC) {
       return 'Ascending';
     } else if (this.editingField.direction === DIRECTION.DESC) {
@@ -251,12 +377,12 @@ export class PivotContextComponent extends AbstractComponent implements OnInit, 
     return 'In order of data';
   }
 
-  protected onChangeOrder(direction: string) {
+  public onChangeOrder(direction: string) {
 
     this.editingField.direction = DIRECTION[direction];
 
     // return pivot or shelf by chart type
-    let list = this.returnPivotShelf();
+    const list = this.returnPivotShelf();
 
     // 기존의 마지막 Sort를 제거한다.
     list.forEach((item) => {
@@ -267,7 +393,7 @@ export class PivotContextComponent extends AbstractComponent implements OnInit, 
     this.changePivotContext.emit({type: 'changePivot'});
   }
 
-  protected hasAlign(direction: string) {
+  public hasAlign(direction: string) {
     if (direction === 'NONE' && !this.editingField.hasOwnProperty('direction')) {
       return true;
     }
@@ -279,8 +405,7 @@ export class PivotContextComponent extends AbstractComponent implements OnInit, 
    * @param aggregationTypeId aggregationType 아이디 (SUM/AVG/COUNT/MIN/MAX/PERCENTILE)
    * @param aggTypeOption PERCENTILE처럼 3depth의 선택값
    */
-  protected onChangeAggregationType(aggregationTypeId: string, aggTypeOption: number) {
-
+  public onChangeAggregationType(aggregationTypeId: string, aggTypeOption: number) {
     // 이벤트 버블링 stop
     event.stopPropagation();
 
@@ -329,7 +454,7 @@ export class PivotContextComponent extends AbstractComponent implements OnInit, 
    */
   public onChangeFormat(formatType: string): void {
 
-    if (formatType != '') {
+    if (formatType !== '') {
       // Dispatch Event
       const field: AbstractField = _.cloneDeep(this.editingField);
       if (!field.format) {
@@ -356,7 +481,7 @@ export class PivotContextComponent extends AbstractComponent implements OnInit, 
   }
 
   // 시리즈로 표현가능 여부
-  protected isPossibleSeries() {
+  public isPossibleSeries() {
 
     // 보조축이 가능한 차트인지 체크
     if (!_.eq(this.chartType, ChartType.BAR)
@@ -371,7 +496,7 @@ export class PivotContextComponent extends AbstractComponent implements OnInit, 
     }
 
     // 첫번째 아이템이 아닌지 체크
-    if (this.pivot.aggregations[0] == this.editingField) {
+    if (this.pivot.aggregations[0] === this.editingField) {
       return false;
     }
 
@@ -382,15 +507,16 @@ export class PivotContextComponent extends AbstractComponent implements OnInit, 
   /**
    * 보조축 On / Off 핸들러
    */
-  public onChangeSecondaryAxis($event: Event): void {
+  public onChangeSecondaryAxis(_$event: Event): void {
 
     // 보조축
-    let secondaryAxis: UIChartAxis = _.cloneDeep(this.uiOption.yAxis);
-    secondaryAxis.name = this.editingField.alias;
+    const secondaryAxis: UIChartAxis = _.cloneDeep(this.uiOption.yAxis);
+    // secondaryAxis.name = this.editingField.alias;
+    this.editingField.isSecondaryAxis = !this.editingField.isSecondaryAxis;
     this.uiOption.secondaryAxis = secondaryAxis;
 
     // 이벤트 발생
-    this.changePivotContext.emit({type: 'changePivot'});
+    this.changePivotContext.emit({type: 'changeSecondaryAxis', value: this.editingField});
   }
 
   /**
@@ -399,21 +525,21 @@ export class PivotContextComponent extends AbstractComponent implements OnInit, 
    * @param byUnitShowFl byUnit show/hide 설정
    * @returns {string}
    */
-  protected getGranularityName(field: AbstractField, byUnitShowFl?: boolean) {
+  public getGranularityName(field: AbstractField, byUnitShowFl?: boolean) {
     // byUnit이 있는경우 3depth에 대한 명칭도 보여줌
     return field.format && field.format.unit ? field.format.byUnit && byUnitShowFl ? field.format.unit.toString() + ' BY ' + field.format.byUnit.toString() : field.format.unit.toString() : '';
   }
 
-  protected onChangeGranularity(discontinuous: boolean, unit: string, byUnit?: string) {
+  public onChangeGranularity(discontinuous: boolean, unit: string, byUnit?: string) {
 
     // 같은 granularity를 선택시 return
-    if (this.editingField.format.discontinuous == discontinuous && this.editingField.format.unit == TimeUnit[unit] &&
-      this.editingField.format.byUnit == ByTimeUnit[byUnit]) {
+    if (this.editingField.format.discontinuous === discontinuous && this.editingField.format.unit === TimeUnit[unit] &&
+      this.editingField.format.byUnit === ByTimeUnit[byUnit]) {
       return;
     }
 
     // 사용자 색상이 설정된경우 granularity를 변경시
-    if (this.uiOption.color && (<UIChartColorByValue>this.uiOption.color).ranges && (<UIChartColorByValue>this.uiOption.color).ranges.length > 0 &&
+    if (this.uiOption.color && (this.uiOption.color as UIChartColorByValue).ranges && (this.uiOption.color as UIChartColorByValue).ranges.length > 0 &&
       (this.editingField.format.discontinuous !== discontinuous || this.editingField.format.unit !== TimeUnit[unit])) {
 
       const modal = new Modal();
@@ -442,17 +568,17 @@ export class PivotContextComponent extends AbstractComponent implements OnInit, 
     return this.useGranularity(discontinuous, unit, this.editingField.granularity, byUnit);
   }
 
-  protected isGranularitySelected(field: AbstractField, discontinuous: boolean, unit: string, byUnit?: string) {
+  public isGranularitySelected(field: AbstractField, discontinuous: boolean, unit: string, byUnit?: string) {
 
     if (_.isUndefined(field.format)) {
       return false;
     }
 
     if (!discontinuous) {
-      return (!field.format.discontinuous && field.format.unit == TimeUnit[unit]);
+      return (!field.format.discontinuous && field.format.unit === TimeUnit[unit]);
     } else {
-      return (field.format.discontinuous && field.format.unit == TimeUnit[unit])
-        && (!byUnit || (byUnit && field.format.byUnit == ByTimeUnit[byUnit]));
+      return (field.format.discontinuous && field.format.unit === TimeUnit[unit])
+        && (!byUnit || (byUnit && field.format.byUnit === ByTimeUnit[byUnit]));
     }
   }
 
@@ -466,30 +592,14 @@ export class PivotContextComponent extends AbstractComponent implements OnInit, 
     return (field['aggregationType']) ? (field['aggregationType'] + '(' + displayName + ')') : displayName;
   } // function - getAliasPlaceholder
 
-
-  /**
-   * 보조축으로 사용중인 필드여부
-   */
-  protected isSecondaryAxis(): boolean {
-
-    // X, Y축만 있다면 사용중이 아님
-    if (this.uiOption.secondaryAxis) {
-      return false;
-    }
-
-    // 현재필드의 보조축인지 체크
-    return this.uiOption.secondaryAxis && this.uiOption.secondaryAxis.name == this.editingField.alias;
-  }
-
   /**
    * when click outside of context menu
    *
-   * @param event - 마우스 이벤트
+   * @param _event - 마우스 이벤트
    */
-  public clickOutside(event: MouseEvent) {
+  public clickOutside(_event: MouseEvent) {
     this.editingField = null;
-    this.fix2DepthContext = false;
-    this.fixMeasureFormatContext = false;
+    this.hideAllSubContext();
 
     // when it's null, two way binding doesn't work
     this.changePivotContext.emit({type: 'outside', value: this.editingField});
@@ -513,13 +623,13 @@ export class PivotContextComponent extends AbstractComponent implements OnInit, 
     let returnValue: boolean = false;
 
     // type is measure, custom field aggregated is false => show
-    if (this.editingField.type == 'measure' && !this.editingField.aggregated) {
+    if (this.editingField.type === 'measure' && !this.editingField.aggregated) {
 
       // map chart => point, heatmap
       if (ChartType.MAP === this.uiOption.type) {
 
-        let mapUIOption = (<UIMapOption>this.uiOption);
-        let layerType = mapUIOption.layers[mapUIOption.layerNum].type;
+        const mapUIOption = (this.uiOption as UIMapOption);
+        const layerType = mapUIOption.layers[mapUIOption.layerNum].type;
 
         // point, heatmap, line, polygon => no aggregation / hexagon => set aggregation
         if (MapLayerType.TILE === layerType) {
@@ -537,17 +647,17 @@ export class PivotContextComponent extends AbstractComponent implements OnInit, 
 
   /**
    * 사용 가능한 Granularity인지 여부
-   * @param discontinuous
+   * @param _discontinuous
    * @param unit
    * @param granularity
-   * @param byUnit
+   * @param _byUnit
    */
-  private useGranularity(discontinuous: boolean, unit: string, granularity: GranularityType, byUnit?: string): boolean {
+  private useGranularity(_discontinuous: boolean, unit: string, granularity: GranularityType, _byUnit?: string): boolean {
 
     // granularity 가중치 반환 (SECOND => YEAR로 갈수록 점수가 높아짐)
-    const getGranularityScore = (granularity: string): number => {
+    const getGranularityScore = (granularityType: string): number => {
       let score: number = 0;
-      switch (granularity) {
+      switch (granularityType) {
         // 초단위 제거 요청으로 주석처리
         case String(GranularityType.SECOND):
           score = 1;
@@ -578,10 +688,10 @@ export class PivotContextComponent extends AbstractComponent implements OnInit, 
     };
 
     // 해당 필드가 가능한 최소 Granularity Scope
-    let minGranularityScore: number = getGranularityScore(String(granularity));
+    const minGranularityScore: number = getGranularityScore(String(granularity));
 
     // 체크할 Granularity가 최소 Granularity Scope보다 같거나 높아야만 true
-    let granularityScore: number = getGranularityScore(unit);
+    const granularityScore: number = getGranularityScore(unit);
 
     return granularityScore >= minGranularityScore;
   }
@@ -602,7 +712,7 @@ export class PivotContextComponent extends AbstractComponent implements OnInit, 
     } else {
 
       // value가 있는경우
-      if (this.editingField.options.indexOf(key) != -1) {
+      if (this.editingField.options.indexOf(key) !== -1) {
 
         const optionsList = this.editingField.options.split(',');
 
@@ -611,7 +721,7 @@ export class PivotContextComponent extends AbstractComponent implements OnInit, 
           const option = optionsList[num];
 
           // 해당 key가 있는경우
-          if (option.indexOf(key) != -1) {
+          if (option.indexOf(key) !== -1) {
             optionsList[num] = num !== 0 ? key + optionData : key + optionData;
           }
         }
@@ -633,11 +743,65 @@ export class PivotContextComponent extends AbstractComponent implements OnInit, 
   private returnPivotShelf(): Field[] {
     let list: any[];
     if (ChartType.MAP === this.uiOption.type) {
-      list = this.shelf.layers[(<UIMapOption>this.uiOption).layerNum].fields;
+      list = this.shelf.layers[(this.uiOption as UIMapOption).layerNum].fields;
     } else {
       list = _.concat(this.pivot.columns, this.pivot.rows, this.pivot.aggregations);
     }
     return list;
   }
+
+  /* +=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=
+   * Measure Color 관련 기능
+   * +=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=*/
+  /**
+   * 컬러 타입 선택 여부
+   * @param type
+   */
+  public isSelectedColorType(type: 'GRADATION' | 'INDIVIDUAL'): boolean {
+    const fieldColor = this.editingField.color;
+    if( fieldColor ) {
+      if( 'GRADATION' === type ) {
+        return fieldColor.schema && '' !== fieldColor.schema.key;
+      } else {
+        return fieldColor.rgb && '' !== fieldColor.rgb;
+      }
+    } else {
+      return false;
+    }
+  } // func - isSelectedColorType
+
+  /**
+   * 그라데이션 색상 변경
+   * @param schemaInfo
+   */
+  public changeGradationColor(schemaInfo: {index: number, colorNum: string}): void {
+    // {index: 8, colorNum: "VC8"}
+    console.log( '>>>>>> changeGradationColor : ', schemaInfo, this.editingField );
+    this.editingField.color = { schema : {
+        idx : schemaInfo.index,
+        key : schemaInfo.colorNum
+      }
+    };
+    this.changePivotContext.emit({type: 'changeMeasureColor', value: this.editingField});
+  } // func - changeGradationColor
+
+  /**
+   * 단색 변경
+   * @param colorCode
+   */
+  public changeSolidColor(colorCode:string): void {
+    // #30c5fe
+    console.log( '>>>>>> changeSolidColor : ', colorCode, this.editingField );
+    this.editingField.color = { rgb : colorCode };
+    this.changePivotContext.emit({type: 'changeMeasureColor', value: this.editingField});
+  } // func - changeSolidColor
+
+  /**
+   * Picker 표시
+   */
+  public showPicker(): void {
+    this.isShowPicker = true;
+    this.colorPicker.openPicker();
+  } // func - showPicker
 
 }

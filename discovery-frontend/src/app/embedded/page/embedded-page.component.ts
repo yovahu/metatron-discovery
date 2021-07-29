@@ -17,34 +17,33 @@ import {
   ChangeDetectionStrategy,
   Component,
   ElementRef,
-  HostListener,
   Injector,
   OnDestroy,
   OnInit,
   ViewChild
 } from '@angular/core';
-import {AbstractComponent} from '../../common/component/abstract.component';
+import {AbstractComponent} from '@common/component/abstract.component';
 import {ActivatedRoute} from '@angular/router';
-import {CookieConstant} from '../../common/constant/cookie.constant';
-import {BaseChart} from '../../common/component/chart/base-chart';
+import {CookieConstant} from '@common/constant/cookie.constant';
+import {BaseChart} from '@common/component/chart/base-chart';
 import {BarChartComponent} from 'app/common/component/chart/type/bar-chart.component';
-import {LineChartComponent} from '../../common/component/chart/type/line-chart.component';
-import {ChartType, SPEC_VERSION} from '../../common/component/chart/option/define/common';
-import {NetworkChartComponent} from '../../common/component/chart/type/network-chart.component';
-import {OptionGenerator} from '../../common/component/chart/option/util/option-generator';
-import {SearchQueryRequest} from '../../domain/datasource/data/search-query-request';
-import {Filter} from '../../domain/workbook/configurations/filter/filter';
+import {LineChartComponent} from '@common/component/chart/type/line-chart.component';
+import {ChartType, SPEC_VERSION} from '@common/component/chart/option/define/common';
+import {NetworkChartComponent} from '@common/component/chart/type/network-chart.component';
+import {OptionGenerator} from '@common/component/chart/option/util/option-generator';
+import {SearchQueryRequest} from '@domain/datasource/data/search-query-request';
+import {Filter} from '@domain/workbook/configurations/filter/filter';
 import {FilterUtil} from '../../dashboard/util/filter.util';
-import {PageWidget, PageWidgetConfiguration} from '../../domain/dashboard/widget/page-widget';
-import {UIOption} from '../../common/component/chart/option/ui-option';
+import {PageWidget, PageWidgetConfiguration} from '@domain/dashboard/widget/page-widget';
+import {UIOption} from '@common/component/chart/option/ui-option';
 import {DatasourceService} from '../../datasource/service/datasource.service';
 import {AnalysisPredictionService} from '../../page/component/analysis/service/analysis.prediction.service';
 import {WidgetService} from '../../dashboard/service/widget.service';
 import {DashboardUtil} from '../../dashboard/util/dashboard.util';
-import {CommonUtil} from '../../common/util/common.util';
-import {MapChartComponent} from '../../common/component/chart/type/map-chart/map-chart.component';
-import {CustomField} from "../../domain/workbook/configurations/field/custom-field";
-import {BoardConfiguration} from "../../domain/dashboard/dashboard";
+import {CommonUtil} from '@common/util/common.util';
+import {MapChartComponent} from '@common/component/chart/type/map-chart/map-chart.component';
+import {CustomField} from '@domain/workbook/configurations/field/custom-field';
+import {BoardConfiguration} from '@domain/dashboard/dashboard';
 
 @Component({
   selector: 'app-embedded-page',
@@ -58,7 +57,7 @@ export class EmbeddedPageComponent extends AbstractComponent implements OnInit, 
   |-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=*/
 
   @ViewChild('chart')
-  private chart: BaseChart;
+  private chart: BaseChart<UIOption>;
 
   /*-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=
   | Protected Variables
@@ -131,10 +130,10 @@ export class EmbeddedPageComponent extends AbstractComponent implements OnInit, 
     super.ngOnDestroy();
   }
 
-  @HostListener('window:popstate', ['$event'])
-  public onPopstate() {
-    window.history.pushState(null, null, window.location.href);
-  }
+  // @HostListener('window:popstate')
+  // public onPopstate() {
+  //   window.history.pushState(null, null, window.location.href);
+  // }
 
 
   /**
@@ -154,11 +153,11 @@ export class EmbeddedPageComponent extends AbstractComponent implements OnInit, 
           } else if (this.chart.uiOption.type === ChartType.LABEL) {
 
           } else if (this.widgetConfiguration.chart.type.toString() === 'grid') {
-            //(<GridChartComponent>this.chart).grid.arrange();
+            // (<GridChartComponent>this.chart).grid.arrange();
           } else if (this.chart.uiOption.type === ChartType.NETWORK) {
-            (<NetworkChartComponent>this.chart).draw();
+            (this.chart as NetworkChartComponent).draw();
           } else if (this.chart.uiOption.type === ChartType.MAP) {
-            (<MapChartComponent>this.chart).resize();
+            (this.chart as MapChartComponent).resize();
           } else {
             if (this.chart && this.chart.chart) this.chart.chart.resize();
           }
@@ -281,9 +280,14 @@ export class EmbeddedPageComponent extends AbstractComponent implements OnInit, 
    */
   private _getPageInfo(pageId: string) {
     this.widgetService.getWidget(pageId).then(result => {
-      this.widget = <PageWidget>_.extend(new PageWidget(), result);
-      this.widgetConfiguration = <PageWidgetConfiguration>this.widget.configuration;
+      this.widget = (_.extend(new PageWidget(), result) as PageWidget);
+      this.widgetConfiguration = (this.widget.configuration as PageWidgetConfiguration);
       this.chartType = this.widgetConfiguration.chart.type.toString();
+      this.widget.dashBoard.configuration.fields
+        = this.widget.dashBoard.dataSources.reduce((acc, ds) => {
+          ds.fields.forEach( dsInfo => dsInfo.dataSource = ds.engineName);
+          return acc.concat(ds.fields);
+      }, []);
       this.changeDetect.detectChanges();
       this._search();
     });
@@ -350,7 +354,7 @@ export class EmbeddedPageComponent extends AbstractComponent implements OnInit, 
 
     this.loadingShow();
 
-    this.datasourceService.searchQuery(cloneQuery).then((data) => {
+    this.datasourceService.searchQuery(cloneQuery, this.widget.dashBoard).then((data) => {
 
       this.resultData = {
         data,
@@ -362,7 +366,7 @@ export class EmbeddedPageComponent extends AbstractComponent implements OnInit, 
         }
       };
 
-      let optionKeys = Object.keys(this.uiOption);
+      const optionKeys = Object.keys(this.uiOption);
       if (optionKeys && optionKeys.length === 1) {
         delete this.resultData.uiOption;
       }
@@ -387,6 +391,7 @@ export class EmbeddedPageComponent extends AbstractComponent implements OnInit, 
       this.showError();
       this.loadingHide();
     });
+
   } // function - _search
 
   /**
@@ -395,7 +400,7 @@ export class EmbeddedPageComponent extends AbstractComponent implements OnInit, 
   private _makeSearchQueryParam(cloneQuery): SearchQueryRequest {
 
     // 선반 데이터 설정
-    for (let field of _.concat(cloneQuery.pivot.columns, cloneQuery.pivot.rows, cloneQuery.pivot.aggregations)) {
+    for (const field of _.concat(cloneQuery.pivot.columns, cloneQuery.pivot.rows, cloneQuery.pivot.aggregations)) {
       delete field['field'];
       delete field['currentPivot'];
       delete field['granularity'];
@@ -404,7 +409,7 @@ export class EmbeddedPageComponent extends AbstractComponent implements OnInit, 
 
     // map - set shelf layers
     if (cloneQuery.shelf && cloneQuery.shelf.layers && cloneQuery.shelf.layers.length > 0) {
-      for (let layer of cloneQuery.shelf.layers[0]) {
+      for (const layer of cloneQuery.shelf.layers[0]) {
         delete layer['field'];
         delete layer['currentPivot'];
         delete layer['granularity'];
@@ -413,8 +418,12 @@ export class EmbeddedPageComponent extends AbstractComponent implements OnInit, 
     }
 
     // 필터 설정
-    for (let filter of cloneQuery.filters) {
-      filter = FilterUtil.convertToServerSpec(filter);
+    if( cloneQuery.filters ) {
+      for (let idx = 0, nMax = cloneQuery.filters.length; idx < nMax; idx++) {
+        let filter = cloneQuery.filters[idx];
+        filter = FilterUtil.convertRelativeToInterval(filter, this.widget.dashBoard);
+        cloneQuery.filters[idx] = FilterUtil.convertToServerSpec(filter);
+      }
     }
 
     // 값이 없는 측정값 필터 제거
@@ -424,6 +433,7 @@ export class EmbeddedPageComponent extends AbstractComponent implements OnInit, 
         FilterUtil.isTimeAllFilter(item) ||
         FilterUtil.isTimeRelativeFilter(item) ||
         FilterUtil.isTimeRangeFilter(item) ||
+        FilterUtil.isTimeSingleFilter(item) ||
         (FilterUtil.isTimeListFilter(item) && item['valueList'] && 0 < item['valueList'].length);
     });
 

@@ -13,19 +13,11 @@
  */
 
 import * as $ from 'jquery';
-import {
-  AfterViewInit,
-  ChangeDetectorRef,
-  ElementRef,
-  HostListener,
-  Injector,
-  OnDestroy,
-  OnInit
-} from '@angular/core';
+import {AfterViewInit, ChangeDetectorRef, ElementRef, HostListener, Injector, OnDestroy, OnInit} from '@angular/core';
 import {Router} from '@angular/router';
 import {Loading} from '../util/loading.util';
 import {TranslateService} from '@ngx-translate/core';
-import {Page, PageResult} from '../../domain/common/page';
+import {Page, PageResult} from '@domain/common/page';
 import {Subscription} from 'rxjs/Subscription';
 import {Location} from '@angular/common';
 import {CommonConstant} from '../constant/common.constant';
@@ -37,17 +29,17 @@ import {CookieService} from 'ng2-cookies';
 import {Modal} from 'app/common/domain/modal';
 import {SYSTEM_PERMISSION} from '../permission/permission';
 import {CommonUtil} from '../util/common.util';
-import {User} from '../../domain/user/user';
-import {Group} from '../../domain/user/group';
-import {UserDetail} from '../../domain/common/abstract-history-entity';
+import {User} from '@domain/user/user';
+import {Group} from '@domain/user/group';
+import {UserDetail} from '@domain/common/abstract-history-entity';
 import {StompService, StompState} from '@stomp/ng2-stompjs';
 import {Observable} from 'rxjs';
 import {filter} from 'rxjs/operators';
-import {isUndefined} from "util";
-import {ImplementorType} from "../../domain/dataconnection/dataconnection";
-import {LogicalType} from '../../domain/datasource/datasource';
-import {UsedCriteria} from "../value/used-criteria.data.value";
-import {LocalStorageConstant} from "../constant/local-storage.constant";
+import {isUndefined} from 'util';
+import {ImplementorType} from '@domain/dataconnection/dataconnection';
+import {LogicalType} from '@domain/datasource/datasource';
+import {UsedCriteria} from '../value/used-criteria.data.value';
+import {LocalStorageConstant} from '../constant/local-storage.constant';
 
 declare let moment;
 
@@ -175,7 +167,8 @@ export class AbstractComponent implements OnInit, AfterViewInit, OnDestroy, CanC
   /**
    * unload 전 실행
    */
-  public execBeforeUnload() {}
+  public execBeforeUnload() {
+  }
 
   /**
    * deactive 체크
@@ -245,6 +238,13 @@ export class AbstractComponent implements OnInit, AfterViewInit, OnDestroy, CanC
   }
 
   /**
+   * 로딩 표시 여부
+   */
+  public isVisibleLoading(): boolean {
+    return Loading.isVisible();
+  }
+
+  /**
    * attempt to use a destroyed view detectchanges 오류를 발생하지 않기 위해
    * 안전하게 변경사항을 체크하는 메서드
    * (주의) 변경사항이 갱신되지 않을 수도 있다.
@@ -267,9 +267,9 @@ export class AbstractComponent implements OnInit, AfterViewInit, OnDestroy, CanC
    * moment 재정의
    * @param date
    */
-  public customMoment( date:(Date|string) ) {
+  public customMoment(date: (Date | string)) {
     if (date.constructor === String) {
-      return moment((<string>date).replace('.000Z', ''));
+      return moment((date as string).replace('.000Z', ''));
     } else {
       return moment(date);
     }
@@ -311,6 +311,9 @@ export class AbstractComponent implements OnInit, AfterViewInit, OnDestroy, CanC
           break;
         case 'ARRAY':
           result = 'ddp-icon-type-array';
+          break;
+        case 'HASHED_MAP':
+          result = 'ddp-icon-type-etc';
           break;
         case 'CALCULATED':
           result = 'ddp-icon-type-sharp';
@@ -500,7 +503,6 @@ export class AbstractComponent implements OnInit, AfterViewInit, OnDestroy, CanC
   /**
    * 사용가능한 커넥션 타입
    * @param {boolean} isDeleteAll
-   * @returns {any}
    */
   public getEnabledConnectionTypes(isDeleteAll: boolean = false) {
     const types = [
@@ -525,7 +527,6 @@ export class AbstractComponent implements OnInit, AfterViewInit, OnDestroy, CanC
 
   /**
    * 메타데이터 LogicalType 목록
-   * @returns {any[]}
    */
   public getMetaDataLogicalTypeList(): any[] {
     return [
@@ -558,6 +559,11 @@ export class AbstractComponent implements OnInit, AfterViewInit, OnDestroy, CanC
         label: this.translateService.instant('msg.storage.ui.list.array'),
         value: 'ARRAY',
         icon: 'ddp-icon-type-array'
+      },
+      {
+        label: this.translateService.instant('msg.storage.ui.list.hashed.map'),
+        value: 'HASHED_MAP',
+        icon: 'ddp-icon-type-etc'
       },
       {
         label: this.translateService.instant('msg.metadata.ui.dictionary.type.latitude'),
@@ -608,7 +614,6 @@ export class AbstractComponent implements OnInit, AfterViewInit, OnDestroy, CanC
 
   /**
    * 메타데이터 Logical Etc Type 목록
-   * @returns {any[]}
    */
   public getMetaDataLogicalTypeEtcList(): any[] {
     return [
@@ -672,8 +677,8 @@ export class AbstractComponent implements OnInit, AfterViewInit, OnDestroy, CanC
    * @param {string} imgResource
    * @return {string}
    */
-  public getConnImplementorImgUrl(impType:ImplementorType, imgResource?:string ):string {
-    let connImgUrl = '';
+  public getConnImplementorImgUrl(impType: ImplementorType, imgResource?: string): string {
+    let connImgUrl: string;
     switch (impType) {
       case ImplementorType.MYSQL:
         connImgUrl = location.origin + '/assets/images/img_db/ic_db_mysql.png';
@@ -703,8 +708,8 @@ export class AbstractComponent implements OnInit, AfterViewInit, OnDestroy, CanC
    * @param {string} imgResource
    * @return {string}
    */
-  public getConnImplementorWhiteImgUrl(impType:ImplementorType, imgResource?:string ):string {
-    let connImgUrl = '';
+  public getConnImplementorWhiteImgUrl(impType: ImplementorType, imgResource?: string): string {
+    let connImgUrl: string;
     switch (impType) {
       case ImplementorType.MYSQL:
         connImgUrl = location.origin + '/assets/images/img_db/ic_db_mysql_w.png';
@@ -735,8 +740,8 @@ export class AbstractComponent implements OnInit, AfterViewInit, OnDestroy, CanC
    * @param {string} imgResource
    * @return {string}
    */
-  public getConnImplementorGrayImgUrl(impType:ImplementorType, imgResource?:string ):string {
-    let connImgUrl = '';
+  public getConnImplementorGrayImgUrl(impType: ImplementorType, imgResource?: string): string {
+    let connImgUrl: string;
     switch (impType) {
       case ImplementorType.MYSQL:
         connImgUrl = location.origin + '/assets/images/img_db/ic_db_mysql_b.png';
@@ -760,14 +765,22 @@ export class AbstractComponent implements OnInit, AfterViewInit, OnDestroy, CanC
     return connImgUrl;
   } // function - getConnImplementorGrayImgUrl
 
-  public getLanguage():string {
+  public getLanguage(): string {
     return this.translateService.currentLang;
   }
 
-  public setLanguage(lang:string) {
+  public setLanguage(lang: string) {
     this.translateService.use(lang);
     // store language
   }
+
+  /**
+   * Returns true if the given object is null or undefined. Otherwise, returns false.
+   * @param val
+   */
+  public isNullOrUndefined(val): boolean {
+    return val === undefined || val === null;
+  } // func - isNullOrUndefined
 
   /*-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=
    | Protected Method
@@ -794,7 +807,7 @@ export class AbstractComponent implements OnInit, AfterViewInit, OnDestroy, CanC
       });
       this.stomp.initAndConnect();
       (isUndefined(CommonConstant.stomp)) && (CommonConstant.stomp = this.stomp);
-      return new Promise<string>((resolve, reject) => {
+      return new Promise<string>((resolve, _reject) => {
         console.log('Status init');
         // let state = this.stomp.state.pipe(
         //   map((state: number) => {
@@ -816,7 +829,7 @@ export class AbstractComponent implements OnInit, AfterViewInit, OnDestroy, CanC
           ).subscribe(() => {
             console.log(`Will retry ${numRetries} times`);
             if (numRetries <= 0) {
-              console.info('>>>> disconnect');
+              console.log('>>>> disconnect');
               this.stomp.disconnect();
             }
             numRetries--;
@@ -847,7 +860,7 @@ export class AbstractComponent implements OnInit, AfterViewInit, OnDestroy, CanC
       });
     } else {
       // if (this.stomp.connected()) {
-      return new Promise<string>((resolve, reject) => {
+      return new Promise<string>((resolve, _reject) => {
         resolve('CONNECTED');
       });
       // }
@@ -911,9 +924,9 @@ export class AbstractComponent implements OnInit, AfterViewInit, OnDestroy, CanC
         try {
           // 메세지 발신
           const params = {
-            'type': 'View',
-            'object': {'id': id, 'type': type},
-            'generator': {'type': 'WEBAPP', 'name': navigator.userAgent}
+            type: 'View',
+            object: {id: id, type: type},
+            generator: {type: 'WEBAPP', name: navigator.userAgent}
           };
           CommonConstant.stomp.publish(
             {
@@ -942,10 +955,10 @@ export class AbstractComponent implements OnInit, AfterViewInit, OnDestroy, CanC
         try {
           // 메세지 발신
           const params = {
-            'type': 'Link',
-            'object': {'id': sourceId, 'type': sourceType},
-            'target': {'id': targetId, 'type': targetType},
-            'generator': {'type': 'WEBAPP', 'name': navigator.userAgent}
+            type: 'Link',
+            object: {id: sourceId, type: sourceType},
+            target: {id: targetId, type: targetType},
+            generator: {type: 'WEBAPP', name: navigator.userAgent}
           };
           CommonConstant.stomp.publish(
             {
@@ -963,7 +976,7 @@ export class AbstractComponent implements OnInit, AfterViewInit, OnDestroy, CanC
 
   /**
    * xhr 에 대한 공통 에러 핸들러
-   * @param {any} err
+   * @param err
    * @param {string} errMessage
    */
   protected commonExceptionHandler(err: any, errMessage?: string) {
@@ -983,7 +996,7 @@ export class AbstractComponent implements OnInit, AfterViewInit, OnDestroy, CanC
    * @param err
    */
   protected dataprepExceptionHandler(err) {
-    //this.loadingHide();
+    // this.loadingHide();
     console.error(err);
 
     if (err.code && err.code.startsWith('PR') && err.message) {
@@ -992,17 +1005,17 @@ export class AbstractComponent implements OnInit, AfterViewInit, OnDestroy, CanC
       return err;
     } else {
       return {
-        'message': 'msg.dp.alert.unknown.error',
-        'details': JSON.stringify(err)
+        message: 'msg.dp.alert.unknown.error',
+        details: JSON.stringify(err)
       };
     }
   } // function - commonExceptionHandler
 
   protected getUsedCriteriaFromLocalStorage(): UsedCriteria {
-    if(localStorage) {
+    if (localStorage) {
       const usedCriteria = CommonUtil.getLocalStorage(LocalStorageConstant.KEY.USED_CRITERIA);
-      let criteria : UsedCriteria;
-      if(usedCriteria) {
+      let criteria: UsedCriteria;
+      if (usedCriteria) {
         criteria = JSON.parse(usedCriteria);
       } else {
         criteria = new UsedCriteria();
@@ -1015,7 +1028,7 @@ export class AbstractComponent implements OnInit, AfterViewInit, OnDestroy, CanC
   }
 
   protected setUsedCriteriaToLocalStorage(criteria: UsedCriteria): void {
-    CommonUtil.setLocalStorage(LocalStorageConstant.KEY.USED_CRITERIA,  JSON.stringify(criteria));
+    CommonUtil.setLocalStorage(LocalStorageConstant.KEY.USED_CRITERIA, JSON.stringify(criteria));
   }
 
   /*-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=
