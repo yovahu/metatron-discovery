@@ -686,7 +686,7 @@ textarea:-ms-input-placeholder {color: #a7adb2;}
 
 .theme-dark .ddp-layout-lnb .ddp-h1-logo {
     position: absolute;
-    top: 21px;
+    top: 13px;
     left: 52px;
     text-indent: 0;
 }
@@ -1274,8 +1274,8 @@ textarea:-ms-input-placeholder {color: #a7adb2;}
     font-size: 12px;
 }
 
-.theme-dark .user-guide-buttons { 
-    display: block; margin-left: 19.5px; 
+.theme-dark .user-guide-buttons {
+    display: block; margin-left: 19.5px;
 }
 
 /**************************************************************

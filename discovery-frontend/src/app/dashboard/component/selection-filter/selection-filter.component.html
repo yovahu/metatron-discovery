@@ -100,7 +100,7 @@
   <div *ngIf="isShowAutoOn" class="ddp-wrap-right ddp-ui-board-update" [style.padding-right]="showBtnWidget ? '145px' : '20px'">
 <!--    <span class="rs-data-update">최근 데이터 업데이트 {{ingestionHistory?.modifiedTime | date: 'yyyy-MM-dd HH:mm:ss'}}</span>-->
 
-    <a href="javascript:" class="rs-component-box-btn " tooltip="수동 업데이트" direction="down" (click)="updateDashboard()">
+    <a href="javascript:" class="rs-component-box-btn " tooltip="Ручное обновление" direction="down" (click)="updateDashboard()">
       <i class="rs-icon-refresh"></i>
     </a>
     <!-- switch -->
@@ -116,7 +116,7 @@
       <div class="rs-component-popup" *ngIf="isShowUpdateCycle && isAutoUpdate">
         <a href="javascript:" class="rs-btn-pop-close" (click)="onClickUpdateCancel()"></a>
         <div class="rs-popup-title">
-          자동 업데이트 주기
+          Интервал авто-обновления
         </div>
         <div class="rs-form-update">
           <input type="text" class="rs-component-input" [(ngModel)]="updateTime">
@@ -127,7 +127,7 @@
             [className]="'rs-component-selectbox'"
             (onSelected)="setCurrentCycle($event)"></component-select>
           <!-- //selectbox -->
-          <button class="rs-component-btn-pop type-dark" (click)="applyUpdateCycle()">적용</button>
+          <button class="rs-component-btn-pop type-dark" (click)="applyUpdateCycle()">Применить</button>
         </div>
       </div>
     </div>

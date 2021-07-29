@@ -17,17 +17,17 @@
 .ddp-ui-board-update .rs-wrap-swtich {position:relative; display:inline-block;margin:0 8px 0 2px;}
 .ddp-ui-board-update .rs-wrap-swtich .rs-switch-auto:hover .txt-tooltip {display:block;}
 .ddp-ui-board-update .rs-wrap-swtich .rs-switch-auto .txt-tooltip{display:none; position:absolute; top:100%; white-space: nowrap; right:0; left:initial; z-index:10;}
-.ddp-ui-board-update .rs-wrap-swtich .rs-switch-auto .txt-tooltip:before {display: inline-block; width: 4px; height: 8px;position:absolute; bottom: 22px; left:50%; margin:2px 0 0 -2px;  transform: rotate(90deg);background: url(../images/icon_tagview.png) no-repeat; content:'';}
+.ddp-ui-board-update .rs-wrap-swtich .rs-switch-auto .txt-tooltip:before {display: inline-block; width: 4px; height: 8px;position:absolute; bottom: 22px; left:80%; margin:2px 0 0 -2px;  transform: rotate(90deg);background: url(../images/icon_tagview.png) no-repeat; content:'';}
 .ddp-ui-board-update .rs-wrap-swtich .rs-switch-auto .txt-tooltip:after {
-  display:inline-block;padding: 6px;margin:7px 0 0 0; content: '자동 업데이트 켜기'; background-color: rgba(53, 57, 63, 0.9);border-radius:2px;color:#fff;font-size:12px;line-height:12px; }
-.ddp-ui-board-update .rs-wrap-swtich .rs-switch-auto input:checked + span + i + .txt-tooltip:after {content: '자동 업데이트 끄기';}
+  display:inline-block;padding: 6px;margin:7px 0 0 0; content: 'Включить авто-обновление'; background-color: rgba(53, 57, 63, 0.9);border-radius:2px;color:#fff;font-size:12px;line-height:12px; }
+.ddp-ui-board-update .rs-wrap-swtich .rs-switch-auto input:checked + span + i + .txt-tooltip:after {content: 'Отключить авто-обновление';}
 
 .ddp-ui-board-update .rs-switch-auto {cursor:pointer;}
 .ddp-ui-board-update .rs-switch-auto i {display:inline-block; width:22px; height:14px; background:url(../images/icon_toggle.png) no-repeat; vertical-align: top;}
-.ddp-ui-board-update .rs-switch-auto > span {display:inline-block; width:57px;}
-.ddp-ui-board-update .rs-switch-auto > span:before {margin-right:7px; color:#b6b9c2; font-size:11px; content:'Auto OFF'; vertical-align: top;}
+.ddp-ui-board-update .rs-switch-auto > span {display:inline-block; width:38px;}
+.ddp-ui-board-update .rs-switch-auto > span:before {margin-right:7px; color:#b6b9c2; font-size:11px; content:'ВЫКЛ'; vertical-align: top;}
 .ddp-ui-board-update .rs-switch-auto > input:checked + span + i {background-position-y:-15px;}
-.ddp-ui-board-update .rs-switch-auto > input:checked + span:before {color:#666eb2;content:'Auto ON'}
+.ddp-ui-board-update .rs-switch-auto > input:checked + span:before {color:#666eb2;content:'ВКЛ'}
 .ddp-ui-board-update .rs-switch-auto > input {display:none;}
 
 /****************************************************************************

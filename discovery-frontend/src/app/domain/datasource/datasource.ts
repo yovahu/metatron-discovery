@@ -587,11 +587,11 @@ export enum SourceType {
 }
 
 export enum Status {
-  ENABLED = 'ENABLED',
-  PREPARING = 'PREPARING',
-  FAILED = 'FAILED',
-  BAD = 'BAD',
-  DISABLED = 'DISABLED'
+  ENABLED = 'Активен',
+  PREPARING = 'Подготовка',
+  FAILED = 'Ошибка',
+  BAD = 'Плохой',
+  DISABLED = 'Отключен'
 }
 
 export enum LogicalType {
@@ -664,9 +664,9 @@ export class FieldValueAlias extends FieldAlias {
  * Temporary Datasource Status
  */
 export enum TempDsStatus {
-  ENABLE = 'ENABLE',
-  PREPARING = 'PREPARING',
-  DISABLE = 'DISABLE'
+  ENABLE = 'Активен',
+  PREPARING = 'Подготовка',
+  DISABLE = 'Отключен'
 }
 
 export class FieldFormat {

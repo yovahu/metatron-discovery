@@ -306,15 +306,15 @@ export class ResourcesViewComponent extends AbstractComponent implements OnInit,
   public getSourceStatusString(status: Status): string {
     switch (status) {
       case Status.ENABLED:
-        return 'Enabled';
+        return 'Активен';
       case Status.PREPARING:
-        return 'Preparing';
+        return 'Подготовка';
       case Status.DISABLED:
-        return 'Disabled';
+        return 'Отключен';
       case Status.FAILED:
-        return 'Failed';
+        return 'Ошибка';
       default:
-        return 'Disabled';
+        return 'Отключен';
     }
   }
 

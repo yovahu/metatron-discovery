@@ -44673,8 +44673,9 @@
 
 .theme-dark .ddp-sso-loading em.ddp-icon-logo {
     display: inline-block;
-    width: 278px;
+    width: 124px;
     height: 35px;
+    background: url(../../../images/sibDigitalLogo2.png) no-repeat;
 }
 
 .theme-dark .ddp-sso-loading em.ddp-icon-logo .st0 {

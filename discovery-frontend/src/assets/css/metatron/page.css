@@ -198,7 +198,8 @@
 .ddp-box-widget.ddp-active.ddp-popup-show
 {z-index:initial;}
 .page-dashboard .ddp-box-widget .popup-chart-data {display:block !important; position:fixed; left:0; right:0; bottom:0; top:0; z-index:200;}
-
+.page-dashboard .ddp-ui-fix-buttons {width:136px !important;}
+.page-dashboard .rs-component-btn-icon1.type-option {margin-top: -2px !important;}
 /**************************************************************
   Page : 대시보드 열람 (툴팁)
 **************************************************************/
@@ -9724,7 +9725,7 @@ ul.ddp-list-setinfo li .ddp-setinfo-contents .ddp-ui-setinfo .ddp-txt-title {col
 }
 .ddp-sso-loading {position:absolute; top:50%; left:50%; margin:-250px 0 0 -250px; width:500px; height:500px; background-color:rgba(255,255,255,0.7); z-index:10;}
 .ddp-sso-loading .ddp-wrap-logo {padding:110px 0 60px 0; text-align:center;}
-.ddp-sso-loading em.ddp-icon-logo {display:inline-block; width:278px; height:35px;}
+.ddp-sso-loading em.ddp-icon-logo {display:inline-block; width:124px; height:35px; background: url("../../images/sibDigitalLogo2.png") no-repeat;}
 .ddp-sso-loading em.ddp-icon-logo .st0{fill:#1A274B;}
 .ddp-sso-loading em.ddp-icon-logo .st1{fill:#272950;}
 .ddp-sso-loading em.ddp-icon-logo .st2{fill:#47DBF4;}

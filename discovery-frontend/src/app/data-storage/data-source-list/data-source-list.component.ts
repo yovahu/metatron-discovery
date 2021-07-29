@@ -267,17 +267,17 @@ export class DataSourceListComponent extends AbstractComponent implements OnInit
   public getSourceStatusLabel(status: Status): string {
     switch (status) {
       case Status.ENABLED:
-        return 'Enabled';
+        return 'Активен';
       case Status.PREPARING:
-        return 'Preparing';
+        return 'Подготовка';
       case Status.DISABLED:
-        return 'Disabled';
+        return 'Отключен';
       case Status.FAILED:
-        return 'Failed';
+        return 'Ошибка';
       case Status.BAD:
-        return 'Bad';
+        return 'Плохой';
       default:
-        return 'Disabled';
+        return 'Отключен';
     }
   }
 

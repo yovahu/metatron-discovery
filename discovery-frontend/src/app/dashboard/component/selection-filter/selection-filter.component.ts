@@ -434,10 +434,10 @@ export class SelectionFilterComponent extends AbstractComponent implements OnIni
     this.updateTime = '30';
     this.historyTime = '30';
     this.updateCycle = [
-      {label: '분', value: 'minute', checked: true},
-      {label: '시간', value: 'hour', checked: false}
+      {label: 'Минут', value: 'minute', checked: true},
+      {label: 'Часов', value: 'hour', checked: false}
     ];
-    this.currentCycle = {label: '분', value: 'minute', checked: true};
+    this.currentCycle = {label: 'Минут', value: 'minute', checked: true};
     this.onClickAutoUpdate(true);
   } // func - _initializeAutoUpdate
 
