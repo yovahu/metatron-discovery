@@ -85,6 +85,7 @@ public class WebSecurityDefaultConfiguration extends WebSecurityConfigurerAdapte
         .antMatchers(HttpMethod.OPTIONS)
         .antMatchers("/"
                     , "/favicon.ico"
+                    , "/sibDigitalLogo2.png"
                     , "/app/v2/**"
                     , "/console/**"
                     , "/api/browser/**"

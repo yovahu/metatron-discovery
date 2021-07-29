@@ -178,15 +178,15 @@ export class DetailWorkspaceLinkedResourcesComponent extends AbstractComponent i
   public getSourceStatusString(status: Status): string {
     switch (status) {
       case Status.ENABLED:
-        return 'Активен';
+        return 'Enabled';
       case Status.PREPARING:
-        return 'Подготовка';
+        return 'Preparing';
       case Status.DISABLED:
-        return 'Отключен';
+        return 'Disabled';
       case Status.FAILED:
-        return 'Ошибка';
+        return 'Failed';
       default:
-        return 'Отключен';
+        return 'Disabled';
     }
   }
 
