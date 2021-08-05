@@ -128,9 +128,12 @@ export class MapChartComponent extends BaseChart<UIMapOption> implements AfterVi
   // OSM Layer
   public osmLayer = new ol.layer.Tile({
     preload: Infinity,
-    source: new ol.source.OSM({
+    source: new ol.source.XYZ({
+      url: 'https://tile.openstreetmap.org/{z}/{x}/{y}.png',
       attributions: this.attribution(),
-      crossOrigin: 'anonymous'
+      crossOrigin: 'anonymous',
+      tilePixelRatio: 2,
+      tileSize: 256 / 2
     })
   });
 
@@ -139,7 +142,9 @@ export class MapChartComponent extends BaseChart<UIMapOption> implements AfterVi
     source: new ol.source.XYZ({
       url: 'http://{1-4}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}.png',
       attributions: this.attribution(),
-      crossOrigin: 'anonymous'
+      crossOrigin: 'anonymous',
+      tilePixelRatio: 2,
+      tileSize: 256 / 2
     })
   });
 
@@ -149,7 +154,9 @@ export class MapChartComponent extends BaseChart<UIMapOption> implements AfterVi
     source: new ol.source.XYZ({
       url: 'http://{1-4}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}.png',
       attributions: this.attribution(),
-      crossOrigin: 'anonymous'
+      crossOrigin: 'anonymous',
+      tilePixelRatio: 2,
+      tileSize: 256 / 2
     })
   });
 
