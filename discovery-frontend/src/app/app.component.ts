@@ -74,12 +74,12 @@ export class AppComponent implements AfterContentChecked {
       } else if (lang === 'ko') {
         this.translateService.use('ko');
         FormatOptionConverter.lang = 'ko';
-      } else if (lang === "en") {
-        this.translateService.use('en');
-        FormatOptionConverter.lang = 'en';
-      } else {
-        this.translateService.use("ru");
+      } else if (lang === 'ru') {
+        this.translateService.use('ru');
         FormatOptionConverter.lang = 'ru';
+      } else {
+        this.translateService.use('en')
+        FormatOptionConverter.lang = 'en';
       }
       this.translateService.setDefaultLang('en');
     }
